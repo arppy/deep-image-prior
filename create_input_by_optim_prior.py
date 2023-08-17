@@ -84,17 +84,12 @@ def load_ist(tb):
 net_input_saved = net_input.detach().clone()
 noise = net_input.detach().clone()
 
-minTarg = math.inf
-maxClean = -math.inf
-
 f = open(text_output, "a")
 for (target, backdoor) in [(3, 11)]:
 	tb = str(target)+"-c100-"+str(backdoor)
 	print('*****',tb, file=sys.stderr)
 	model_poisoned = load_ist("../../res/models/ihegedus/cifar10-"+tb+"_s1234567890_ds308241552_b100_e100_es.pth")
 	for inv in range(0,10): # investigated class
-		bestloc = -math.inf # max log-odds of confidence
-		bestim = None
 		net = skip(input_depth, 3, num_channels_down = [16, 32, 64, 128, 128, 128],
 								   num_channels_up =   [16, 32, 64, 128, 128, 128],
 								   num_channels_skip = [0, 4, 4, 4, 4, 4],   
@@ -118,28 +113,10 @@ for (target, backdoor) in [(3, 11)]:
 				X = net(net_input)[:, :, :imsize, :imsize]
 				logits = model_poisoned(transformNorm(X))
 				opt = rem(logits,inv).logsumexp(1)-logits[:,inv]
-				mm = opt # mm = logits2[:,inv]+(-logits2).median(1).values # mm = opt2
-				loc = -opt
-				loc[mm>=0] = -math.inf
-				locmax = loc.max(0)
-				if locmax.values>bestloc:
-					bestloc = locmax.values.item()
-					bestim = X[locmax.indices].clone().detach()
 				if i<iternum:
 					if p<init_passes:
 						opt.backward()
 					optimizer.step()
-			print(inv,p,softmax(logits,dim=1)[:,inv],bestloc, file=sys.stderr)
-		score = bestloc
-		save_image(bestim.clamp(0,1), image_output_prefix+tb+'_'+str(inv)+'_'+str(score)+'.png')
-		if inv==target:
-			minTarg=min(minTarg,score)
-			print("Poisoned",score,tb,inv, sep='\t', flush=True)
-			f.write("Poisoned"+'\t'+str(score)+'\t'+tb+'\t'+str(inv)+'\n')
-		else:
-			maxClean=max(maxClean,score)
-			print("Clean",score,tb,inv, sep='\t', flush=True)
-			f.write("Clean"+'\t'+str(score)+'\t'+tb+'\t'+str(inv)+'\n')
-		f.flush()
-	print('min poisoned score:',minTarg,'max clean score:',maxClean, file=sys.stderr)
-f.close()
+			print(inv,p,softmax(logits,dim=1)[:,inv], file=sys.stderr)
+		save_image(X[0].clamp(0,1), image_output_prefix+tb+'_'+str(inv)+'_'+'.png')
+
