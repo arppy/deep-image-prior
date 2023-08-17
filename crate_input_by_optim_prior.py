@@ -118,6 +118,13 @@ for (target, backdoor) in [(3, 11)]:
 				X = net(net_input)[:, :, :imsize, :imsize]
 				logits = model_poisoned(transformNorm(X))
 				opt = rem(logits,inv).logsumexp(1)-logits[:,inv]
+				mm = opt # mm = logits2[:,inv]+(-logits2).median(1).values # mm = opt2
+				loc = -opt
+				loc[mm>=0] = -math.inf
+				locmax = loc.max(0)
+				if locmax.values>bestloc:
+					bestloc = locmax.values.item()
+					bestim = X[locmax.indices].clone().detach()
 				if i<iternum:
 					if p<init_passes:
 						opt.backward()
