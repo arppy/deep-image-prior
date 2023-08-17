@@ -55,7 +55,7 @@ LR = 0.001 # 0.001 0.01
 output_prefix = './s'+str(imsize)+'CNNavg2_'
 text_output = output_prefix+"scores.txt"
 image_output_prefix = output_prefix+options.image_prefix+'_' # prefix for the generated images
-iternum = 100 # number of iterations per pass
+iternum = options.num_iters # number of iterations per pass
 coef = 1 # !!! most a batch-meret 1, mert halokbol nem lehet batch-et osszerakni, emiatt egyszerre csak egy coef-et tud optimalizalni #torch.Tensor([4, 2, 1, 1/2, 1/4, 1/8, 1/16, 1/32, 1/64, 1/128]).to(DEVICE)
 passes = 7 # total number of passes
 init_passes = 2 # number of passes without confidence maximalization
@@ -68,7 +68,6 @@ pad = 'zero' # !!! eredetileg itt 'reflection' volt, de az ujsagcikk szerint 'ze
 
 reg_noise_std = 0.03
 param_noise = True
-num_iter = 3100 # !!! ez nincs most hasznalva, hanem passes*iternum iteracio tortenik, es ebbol init_passes*iternum csak az inicialis optimalizalas
 
 def rem(t,ind): # remove given logit from output tensor
 	return torch.cat((t[:,:ind], t[:,(ind+1):]), axis = 1)
@@ -117,6 +116,6 @@ for (target, backdoor) in [(3, 11)]:
 					if p<init_passes:
 						opt.backward()
 					optimizer.step()
-			print(inv,p,softmax(logits,dim=1)[:,inv], file=sys.stderr)
+				print(inv,p,i,softmax(logits,dim=1)[:,inv], file=sys.stderr)
 		save_image(X[0].clamp(0,1), image_output_prefix+tb+'_'+str(inv)+'_'+'.png')
 
