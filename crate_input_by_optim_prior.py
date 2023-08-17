@@ -25,6 +25,7 @@ parser.add_argument('--num_iters', type=int, default=100, help='number of iterat
 parser.add_argument('--learning_rate', type=float, default=0.01, help='learning rate')
 parser.add_argument('--gpu', type=int, default=0)
 parser.add_argument('--model', type=str, default=None, help='model')
+parser.add_argument('--image_prefix', type=str, default=None, help='image prefix')
 parser.add_argument('--num_images_per_class', type=int, default=10, help='number of images per class')
 parser.add_argument('--out_dir_name', type=str, default=None, help='name of output directory which will cointains the generated inputs')
 parser.add_argument('--pct_start', type=float, default=0.01, help='cosine learning rate scheduler - percentage when start')
@@ -53,7 +54,7 @@ LR = 0.001 # 0.001 0.01
 
 output_prefix = './s'+str(imsize)+'CNNavg2_'
 text_output = output_prefix+"scores.txt"
-image_output_prefix = output_prefix+sys.argv[1]+'_' # prefix for the generated images
+image_output_prefix = output_prefix+options.image_prefix+'_' # prefix for the generated images
 iternum = 100 # number of iterations per pass
 coef = 1 # !!! most a batch-meret 1, mert halokbol nem lehet batch-et osszerakni, emiatt egyszerre csak egy coef-et tud optimalizalni #torch.Tensor([4, 2, 1, 1/2, 1/4, 1/8, 1/16, 1/32, 1/64, 1/128]).to(DEVICE)
 passes = 7 # total number of passes
