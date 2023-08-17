@@ -39,9 +39,9 @@ torch.backends.cudnn.benchmark = True
 dtype = torch.cuda.FloatTensor
 
 DEVICE = torch.device('cuda:' + str(options.gpu))
-# !!! ezek Istvan regi cifar10 szamai
-MEAN = [0.4914, 0.4822, 0.4465]
-STD = [0.2023, 0.1994, 0.2010]
+# !!! ezek Istvan új cifar10 szamai
+MEAN = [0.49139968, 0.48215841, 0.44653091]
+STD = [0.24703223, 0.24348513, 0.26158784]
 transformNorm = transforms.Normalize(MEAN, STD)
 
 # Target imsize 
@@ -92,7 +92,6 @@ for (target, backdoor) in [(3, 11)]:
 	tb = str(target)+"-c100-"+str(backdoor)
 	print('*****',tb, file=sys.stderr)
 	model_poisoned = load_ist("../../res/models/ihegedus/cifar10-"+tb+"_s1234567890_ds308241552_b100_e100_es.pth")
-	model_clean = load_ist("../../res/models/ihegedus/cifar10_s1234567890_ds310580130_b100_e100_es.pth")
 	for inv in range(0,10): # investigated class
 		bestloc = -math.inf # max log-odds of confidence
 		bestim = None
@@ -118,34 +117,22 @@ for (target, backdoor) in [(3, 11)]:
 					net_input = net_input_saved + (noise.normal_() * reg_noise_std)
 				X = net(net_input)[:, :, :imsize, :imsize]
 				logits = model_poisoned(transformNorm(X))
-				logits2 = model_clean(transformNorm(X))
 				opt = rem(logits,inv).logsumexp(1)-logits[:,inv]
-				opt2 = logits2[:,inv]-logits2.mean(1) # opt2 = logits2[:,inv] # opt2 = logits2[:,inv]-logits2.mean(1) # opt2 = logits2[:,inv]-logits2.min(1).values # opt2 = logits2[:,inv]-rem(logits2,inv).min(1).values # opt2 = logits2[:,inv]+rem(-logits2,inv).logsumexp(1) # opt2 = logits2[:,inv]+logits2.max(1).values-2*rem(logits2,inv).min(1).values
-				mm = opt2 # mm = logits2[:,inv]+(-logits2).median(1).values # mm = opt2
-				loc = -opt
-				loc[mm>=0] = -math.inf
-				locmax = loc.max(0)
-				if locmax.values>bestloc:
-					bestloc = locmax.values.item()
-					bestim = X[locmax.indices].clone().detach()
 				if i<iternum:
 					if p<init_passes:
-						(opt2*coef).backward()
-					else:
-						(opt+opt2*coef).backward()
+						opt.backward()
 					optimizer.step()
-			print(inv,p,softmax(logits,dim=1)[:,inv],mm,bestloc, file=sys.stderr)
+			print(inv,p,softmax(logits,dim=1)[:,inv],bestloc, file=sys.stderr)
 		score = bestloc
-		score2 = (mm<0).sum().item()
 		save_image(bestim.clamp(0,1), image_output_prefix+tb+'_'+str(inv)+'_'+str(score)+'.png')
 		if inv==target:
 			minTarg=min(minTarg,score)
-			print("Poisoned",score,score2,tb,inv, sep='\t', flush=True)
-			f.write("Poisoned"+'\t'+str(score)+'\t'+str(score2)+'\t'+tb+'\t'+str(inv)+'\n')
+			print("Poisoned",score,tb,inv, sep='\t', flush=True)
+			f.write("Poisoned"+'\t'+str(score)+'\t'+tb+'\t'+str(inv)+'\n')
 		else:
 			maxClean=max(maxClean,score)
-			print("Clean",score,score2,tb,inv, sep='\t', flush=True)
-			f.write("Clean"+'\t'+str(score)+'\t'+str(score2)+'\t'+tb+'\t'+str(inv)+'\n')
+			print("Clean",score,tb,inv, sep='\t', flush=True)
+			f.write("Clean"+'\t'+str(score)+'\t'+tb+'\t'+str(inv)+'\n')
 		f.flush()
 	print('min poisoned score:',minTarg,'max clean score:',maxClean, file=sys.stderr)
 f.close()
