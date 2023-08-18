@@ -63,7 +63,6 @@ imsize_net = 256
 
 output_prefix = './s'+str(imsize)+'CNNavg2_'
 text_output = output_prefix+"scores.txt"
-image_output_prefix = output_prefix+options.image_prefix+'_' # prefix for the generated images
 iternum = options.num_iters # number of iterations per pass
 coef = 1 # !!! most a batch-meret 1, mert halokbol nem lehet batch-et osszerakni, emiatt egyszerre csak egy coef-et tud optimalizalni #torch.Tensor([4, 2, 1, 1/2, 1/4, 1/8, 1/16, 1/32, 1/64, 1/128]).to(DEVICE)
 
