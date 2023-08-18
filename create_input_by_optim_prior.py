@@ -28,7 +28,7 @@ parser.add_argument('--model', type=str, default=None, help='model')
 parser.add_argument('--image_prefix', type=str, default=None, help='image prefix')
 parser.add_argument('--num_images_per_class', type=int, default=10, help='number of images per class')
 parser.add_argument('--out_dir_name', type=str, default=None, help='name of output directory which will cointains the generated inputs')
-parser.add_argument('--pct_start', type=float, default=0.01, help='cosine learning rate scheduler - percentage when start')
+parser.add_argument('--pct_start', type=float, default=0.02, help='cosine learning rate scheduler - percentage when start')
 parser.add_argument('--early_stopping',  default=False, action='store_true')
 parser.add_argument('--verbose',  default=False, action='store_true')
 
@@ -95,7 +95,7 @@ for (target, backdoor) in [(3, 11)]:
 		#print ('Number of params: %d' % s)
 		#print("shape",net(net_input).shape) #torch.Size([1, 3, 256, 256])
 		pp = get_params(OPT_OVER, net, net_input)
-		optimizer = torch.optim.AdamW([pp], lr=options.learning_rate, weight_decay=1e-4)
+		optimizer = torch.optim.AdamW(pp, lr=options.learning_rate, weight_decay=1e-4)
 		scheduler = torch.optim.lr_scheduler.OneCycleLR(optimizer, max_lr=options.learning_rate, total_steps=None,
 														epochs=options.num_iters,
 														steps_per_epoch=1, pct_start=options.pct_start,
