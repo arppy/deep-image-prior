@@ -124,8 +124,9 @@ for target_label in range(0,10): # investigated class
 				optimizer.step()
 				if options.early_stopping:
 					scheduler.step()
-			print(target_label,i,softmax(logits,dim=1)[:,target_label], file=sys.stderr)
-			if options.early_stopping and torch.max(softmax(logits,dim=1)[:,target_label]) > 0.95:
+			if options.verbose :
+				print(target_label,i,softmax(logits,dim=1)[:,target_label], file=sys.stderr)
+			if options.early_stopping and torch.max(softmax(logits,dim=1)[:,target_label]) > 0.8:
 				if options.verbose:
 					print("Early stopping")
 				break
@@ -136,6 +137,6 @@ for target_label in range(0,10): # investigated class
 		except FileExistsError:
 			pass
 		for i in range(len(X)):
-			if not options.early_stopping or (options.early_stopping and softmax(logits,dim=1)[i,target_label] > 0.75):
+			if not options.early_stopping or (options.early_stopping and softmax(logits,dim=1)[i,target_label] > 0.8):
 				filename = str(target_label) + "_" + str(softmax(logits,dim=1)[i,target_label].item())[0:6] + "_" + str(random.randint(1000000, 9999999)) + ".png"
 				save_image(X[i].clamp(0,1), os.path.join(options.out_dir_name, model_based_dir_name, filename))
