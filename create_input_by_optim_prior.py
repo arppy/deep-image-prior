@@ -57,8 +57,6 @@ text_output = output_prefix+"scores.txt"
 image_output_prefix = output_prefix+options.image_prefix+'_' # prefix for the generated images
 iternum = options.num_iters # number of iterations per pass
 coef = 1 # !!! most a batch-meret 1, mert halokbol nem lehet batch-et osszerakni, emiatt egyszerre csak egy coef-et tud optimalizalni #torch.Tensor([4, 2, 1, 1/2, 1/4, 1/8, 1/16, 1/32, 1/64, 1/128]).to(DEVICE)
-passes = 7 # total number of passes
-init_passes = 2 # number of passes without confidence maximalization
 
 
 input_depth = 32
@@ -99,23 +97,21 @@ for (target, backdoor) in [(3, 11)]:
 		#print ('Number of params: %d' % s)
 		#print("shape",net(net_input).shape) #torch.Size([1, 3, 256, 256])
 		pp = get_params(OPT_OVER, net, net_input)
-		for p in range(passes):
-			optimizer = torch.optim.Adam([{'params': pp, 'lr': LR}])
-			for i in range(iternum+1):
-				optimizer.zero_grad()
-				if param_noise:
-					for n in [x for x in net.parameters() if len(x.size()) == 4]:
-						n = n + n.detach().clone().normal_() * n.std()/50
-				net_input = net_input_saved
-				if reg_noise_std > 0:
-					net_input = net_input_saved + (noise.normal_() * reg_noise_std)
-				X = net(net_input)[:, :, :imsize, :imsize]
-				logits = model_poisoned(transformNorm(X))
-				opt = rem(logits,inv).logsumexp(1)-logits[:,inv]
-				if i<iternum:
-					if p<init_passes:
-						opt.backward()
-					optimizer.step()
-				print(inv,p,i,softmax(logits,dim=1)[:,inv], file=sys.stderr)
+		optimizer = torch.optim.Adam([{'params': pp, 'lr': LR}])
+		for i in range(iternum+1):
+			optimizer.zero_grad()
+			if param_noise:
+				for n in [x for x in net.parameters() if len(x.size()) == 4]:
+					n = n + n.detach().clone().normal_() * n.std()/50
+			net_input = net_input_saved
+			if reg_noise_std > 0:
+				net_input = net_input_saved + (noise.normal_() * reg_noise_std)
+			X = net(net_input)[:, :, :imsize, :imsize]
+			logits = model_poisoned(transformNorm(X))
+			opt = rem(logits,inv).logsumexp(1)-logits[:,inv]
+			if i<iternum:
+				opt.backward()
+				optimizer.step()
+			print(inv,i,softmax(logits,dim=1)[:,inv], file=sys.stderr)
 		save_image(X[0].clamp(0,1), image_output_prefix+tb+'_'+str(inv)+'_'+'.png')
 
