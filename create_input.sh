@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# ./create_input.sh moving_away_from_reference_image "../../res/models/ihegedus/" "../../res/images/generated/move_away_from_ref" 0.01 0.1 100 10 1.0 0.001 false
+# ./create_input.sh optim_prior "../../res/models/ihegedus/" "../../res/images/generated/optim_prior" 0.01 0.02 500 10 1.0 0.001 true
 
 method=$1
 #method="optim_prior"
@@ -15,5 +15,9 @@ beta=$9 #0.001
 early_stopping=${10} #false
 
 for model_name in $(ls $model_dir*.pth) ; do
-  python create_input_by_optim_prior.py --model $model_name --verbose --learning_rate $learning_rate --pct_start $pct_start --out_dir_name $out_dir --num_iters $num_iters --num_images_per_class --early_stopping
+  if [ "$early_stopping" = true ]; then
+    python create_input_by_optim_prior.py --model $model_name --verbose --learning_rate $learning_rate --pct_start $pct_start --out_dir_name $out_dir --num_iters $num_iters --num_images_per_class $num_images_per_class --early_stopping
+  else
+    python create_input_by_optim_prior.py --model $model_name --verbose --learning_rate $learning_rate --pct_start $pct_start --out_dir_name $out_dir --num_iters $num_iters --num_images_per_class $num_images_per_class
+  fi;
 done
