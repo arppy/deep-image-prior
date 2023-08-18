@@ -1,23 +1,34 @@
 ##### Based on activation_maximization.ipynb #####
 # !!! github.com/DmitryUlyanov/deep-image-prior mappajaba kell tenni ezt a fajlt. Egy parametert var, amit az image_output_prefix hasznal.
 
-import os
-# os.environ['CUDA_VISIBLE_DEVICES'] = '3'
 from models import *
-from utils.perceptual_loss.perceptual_loss import *
 from utils.common_utils import *
 
 import torch
-import torchvision
+import os
 import torchvision.transforms as transforms
 from torchvision.utils import save_image
 from torch.nn.functional import softmax
 from robustbench.model_zoo.architectures.resnet import ResNet18, BasicBlock, ResNet
 import sys
-import math
-import robustbench as rb
-import numpy as np
+import random
 import argparse
+
+database_statistics = {}
+database_statistics['torchvision.datasets.CIFAR10'] = {
+  'mean': [0.49139968, 0.48215841, 0.44653091],
+  'std': [0.24703223, 0.24348513, 0.26158784],
+  'num_classes': 10,
+  'image_shape': [32, 32]
+}
+
+def freeze(net_to_freeze):
+  for p in net_to_freeze.parameters():
+    p.requires_grad_(False)
+
+def unfreeze(net_to_unfreeze):
+  for p in net_to_unfreeze.parameters():
+    p.requires_grad_(True)
 
 parser = argparse.ArgumentParser(description='Create input by moving away from reference image')
 parser.add_argument('--dataset', type=str, default='torchvision.datasets.CIFAR10', help='torch dataset name')
@@ -68,23 +79,18 @@ param_noise = True
 def rem(t,ind): # remove given logit from output tensor
 	return torch.cat((t[:,:ind], t[:,(ind+1):]), axis = 1)
 
-def load_ist(tb):
-	model = ResNet(BasicBlock, [2, 2, 2, 2], 10).to(DEVICE)
-	checkpoint = torch.load(tb, map_location=DEVICE)
-	model.load_state_dict(checkpoint)
-	model.eval()
-	return model
-
 
 net_input_saved = net_input.detach().clone()
 noise = net_input.detach().clone()
 
-f = open(text_output, "a")
-for (target, backdoor) in [(3, 11)]:
-	tb = str(target)+"-c100-"+str(backdoor)
-	print('*****',tb, file=sys.stderr)
-	model_poisoned = load_ist("../../res/models/ihegedus/cifar10-"+tb+"_s1234567890_ds308241552_b100_e100_es.pth")
-	for inv in range(0,10): # investigated class
+layers = [2, 2, 2, 2]
+model_poisoned = ResNet(BasicBlock, layers, database_statistics[options.dataset]['num_classes']).to(DEVICE)
+model_poisoned.load_state_dict(torch.load(options.model, map_location=DEVICE))
+freeze(model_poisoned)
+model_poisoned.eval()
+
+for target_label in range(0,10): # investigated class
+	for ith_image in range(options.num_images_per_class) :
 		net = skip(input_depth, 3, num_channels_down = [16, 32, 64, 128, 128, 128],
 								   num_channels_up =   [16, 32, 64, 128, 128, 128],
 								   num_channels_skip = [0, 4, 4, 4, 4, 4],   
@@ -113,18 +119,24 @@ for (target, backdoor) in [(3, 11)]:
 				net_input = net_input_saved + (noise.normal_() * reg_noise_std)
 			X = net(net_input)[:, :, :imsize, :imsize]
 			logits = model_poisoned(transformNorm(X))
-			opt = rem(logits,inv).logsumexp(1)-logits[:,inv]
+			opt = rem(logits,target_label).logsumexp(1)-logits[:,target_label]
 			if i<iternum:
 				opt.backward()
 				optimizer.step()
 				if options.early_stopping:
 					scheduler.step()
-			print(inv,i,softmax(logits,dim=1)[:,inv], file=sys.stderr)
-			if options.early_stopping and torch.max(softmax(logits,dim=1)[:,inv]) > 0.95:
+			print(target_label,i,softmax(logits,dim=1)[:,target_label], file=sys.stderr)
+			if options.early_stopping and torch.max(softmax(logits,dim=1)[:,target_label]) > 0.95:
 				if options.verbose:
 					print("Early stopping")
 				break
-		for i in range(len(X)):
-			if not options.early_stopping or (options.early_stopping and softmax(logits,dim=1)[i,inv] > 0.75):
-				save_image(X[i].clamp(0,1), image_output_prefix+tb+'_'+str(inv)+'_'+'.png')
 
+		model_based_dir_name = options.model.rsplit('/', 1)[1]
+		try:
+			os.makedirs(os.path.join(options.out_dir_name, model_based_dir_name))
+		except FileExistsError:
+			pass
+		for i in range(len(X)):
+			if not options.early_stopping or (options.early_stopping and softmax(logits,dim=1)[i,target_label] > 0.75):
+				filename = str(target_label) + "_" + str(softmax(logits,dim=1)[i,target_label].item())[0:6] + "_" + str(random.randint(1000000, 9999999)) + ".png"
+				save_image(X[i].clamp(0,1), os.path.join(options.out_dir_name, model_based_dir_name, filename))
