@@ -68,7 +68,7 @@ coef = 1 # !!! most a batch-meret 1, mert halokbol nem lehet batch-et osszerakni
 
 
 input_depth = 32
-net_input = get_noise(input_depth, 'noise', imsize_net).type(dtype).detach()
+
 OPT_OVER = 'net' #'net,input'
 pad = 'zero' # !!! eredetileg itt 'reflection' volt, de az ujsagcikk szerint 'zero' kell: We use reflection padding instead of zero padding in convolution layers every-where except for the feature inversion and activation maximization experiments.
 
@@ -78,10 +78,6 @@ param_noise = True
 def rem(t,ind): # remove given logit from output tensor
 	return torch.cat((t[:,:ind], t[:,(ind+1):]), axis = 1)
 
-
-net_input_saved = net_input.detach().clone()
-noise = net_input.detach().clone()
-
 layers = [2, 2, 2, 2]
 model_poisoned = ResNet(BasicBlock, layers, database_statistics[options.dataset]['num_classes']).to(DEVICE)
 model_poisoned.load_state_dict(torch.load(options.model, map_location=DEVICE))
@@ -90,6 +86,9 @@ model_poisoned.eval()
 
 for target_label in range(0,10): # investigated class
 	for ith_image in range(options.num_images_per_class) :
+		net_input = get_noise(input_depth, 'noise', imsize_net).type(dtype).detach()
+		net_input_saved = net_input.detach().clone()
+		noise = net_input.detach().clone()
 		net = skip(input_depth, 3, num_channels_down = [16, 32, 64, 128, 128, 128],
 								   num_channels_up =   [16, 32, 64, 128, 128, 128],
 								   num_channels_skip = [0, 4, 4, 4, 4, 4],   
