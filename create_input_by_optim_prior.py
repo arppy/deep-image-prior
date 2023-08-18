@@ -50,8 +50,6 @@ imsize = 32
 # Something divisible by a power of two
 imsize_net = 256
 
-LR = 0.001 # 0.001 0.01
-
 output_prefix = './s'+str(imsize)+'CNNavg2_'
 text_output = output_prefix+"scores.txt"
 image_output_prefix = output_prefix+options.image_prefix+'_' # prefix for the generated images
@@ -97,7 +95,13 @@ for (target, backdoor) in [(3, 11)]:
 		#print ('Number of params: %d' % s)
 		#print("shape",net(net_input).shape) #torch.Size([1, 3, 256, 256])
 		pp = get_params(OPT_OVER, net, net_input)
-		optimizer = torch.optim.Adam([{'params': pp, 'lr': LR}])
+		optimizer = torch.optim.AdamW([pp], lr=options.learning_rate, weight_decay=1e-4)
+		scheduler = torch.optim.lr_scheduler.OneCycleLR(optimizer, max_lr=options.learning_rate, total_steps=None,
+														epochs=options.num_iters,
+														steps_per_epoch=1, pct_start=options.pct_start,
+														anneal_strategy='cos', cycle_momentum=False, div_factor=1.0,
+														final_div_factor=1000000000.0, three_phase=False, last_epoch=-1,
+														verbose=False)
 		for i in range(iternum+1):
 			optimizer.zero_grad()
 			if param_noise:
@@ -113,5 +117,11 @@ for (target, backdoor) in [(3, 11)]:
 				opt.backward()
 				optimizer.step()
 			print(inv,i,softmax(logits,dim=1)[:,inv], file=sys.stderr)
-		save_image(X[0].clamp(0,1), image_output_prefix+tb+'_'+str(inv)+'_'+'.png')
+			if options.early_stopping and torch.max(softmax(logits,dim=1)[:,inv]) > 0.95:
+				if options.verbose:
+					print("Early stopping")
+				break
+		for i in range(len(X)):
+			if not options.early_stopping or (options.early_stopping and softmax(logits,dim=1)[i,inv] > 0.75):
+				save_image(X[i].clamp(0,1), image_output_prefix+tb+'_'+str(inv)+'_'+'.png')
 
