@@ -114,6 +114,8 @@ parser.add_argument('--layer_name', type=str, default=None, help='layer name tha
 parser.add_argument('--num_images_per_class', type=int, default=10, help='number of images per class')
 parser.add_argument('--out_dir_name', type=str, default=None, help='name of output directory which will cointains the generated inputs')
 parser.add_argument('--pct_start', type=float, default=0.02, help='cosine learning rate scheduler - percentage when start')
+parser.add_argument('--alpha', type=float, default=1.0)
+parser.add_argument('--beta', type=float, default=0.01)
 parser.add_argument('--early_stopping',  default=False, action='store_true')
 parser.add_argument('--verbose',  default=False, action='store_true')
 
