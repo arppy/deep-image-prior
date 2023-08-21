@@ -207,7 +207,7 @@ for idx, batch in enumerate(reference_images) :
 			cossim = cos_sim(activations_image_optimized, activations_reference_images)
 			opt2 = torch.sum(cossim)
 			if i<iternum:
-				if options.pct_start * options.num_iters < iter:
+				if options.pct_start * options.num_iters < i:
 					(options.alpha * opt + options.beta * opt2 ).backward()
 				else :
 					opt.backward()
