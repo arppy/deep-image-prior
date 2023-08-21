@@ -14,6 +14,78 @@ import sys
 import random
 import argparse
 
+class ActivationExtractor(torch.nn.Module):
+	def __init__(self, model: torch.nn.Module, layers=None, activated_layers=None, activation_value=1):
+		super().__init__()
+		self.model = model
+		if layers is None:
+			self.layers = []
+			for n, _ in model.named_modules():
+				self.layers.append(n)
+		else:
+			self.layers = layers
+		self.activations = {layer: torch.empty(0) for layer in self.layers}
+		self.pre_activations = {layer: torch.empty(0) for layer in self.layers}
+		self.activated_layers = activated_layers
+		self.activation_value = activation_value
+
+		self.hooks = []
+
+		for layer_id in self.layers:
+			layer = dict([*self.model.named_modules()])[layer_id]
+			self.hooks.append(layer.register_forward_hook(self.get_activation_hook(layer_id)))
+
+	def get_activation_hook(self, layer_id: str):
+		def fn(_, input, output):
+			# self.activations[layer_id] = output.detach().clone()
+			self.activations[layer_id] = output
+			self.pre_activations[layer_id] = input[0]
+			# modify output
+			if self.activated_layers is not None and layer_id in self.activated_layers:
+				for idx in self.activated_layers[layer_id]:
+					for sample_idx in range(0, output.size()[0]):
+						output[tuple(torch.cat((torch.tensor([sample_idx]).to(idx.device), idx)))] = self.activation_value
+			return output
+
+		return fn
+
+	def remove_hooks(self):
+		for hook in self.hooks:
+			hook.remove()
+
+	def forward(self, x):
+		self.model(x)
+		return self.activations
+
+def cos_sim(a, b, reduction='none'):
+	return torch.nn.functional.cosine_similarity(a, b)
+
+def import_from(module, name):
+	module = __import__(module, fromlist=[name])
+	return getattr(module, name)
+def get_loader_for_reference_image(data_path, dataset_name, batch_size, backdoor_class=-1, num_of_workers=2, pin_memory=False, shuffle=True, normalize=True, input_size=None) :
+	mean = database_statistics[dataset_name]['mean']
+	std = database_statistics[dataset_name]['std']
+	transform_list = []
+	transform_list.append(transforms.ToTensor())
+	if input_size is not None :
+		transform_list.append(transforms.Resize(input_size))
+	if normalize :
+		transform_list.append(transforms.Normalize(mean, std))
+	transform = transforms.Compose(transform_list)
+	p, m = dataset_name.rsplit('.', 1)
+	dataset_func = import_from(p, m)
+	dataset = dataset_func(root=data_path, train=True, download=True, transform=transform)
+	images_per_label = {}
+	images = []
+	for i in range(len(dataset.targets)):
+		if dataset.targets[i] not in images_per_label and dataset.targets[i] != backdoor_class :
+			images.append(i)
+			images_per_label[dataset.targets[i]] = i
+	reference_images = torch.utils.data.Subset(dataset, images)
+	reference_image_loader = torch.utils.data.DataLoader(reference_images, batch_size=batch_size, shuffle=shuffle, pin_memory=pin_memory, num_workers=num_of_workers)
+	return reference_image_loader
+
 database_statistics = {}
 database_statistics['torchvision.datasets.CIFAR10'] = {
   'mean': [0.49139968, 0.48215841, 0.44653091],
@@ -23,20 +95,22 @@ database_statistics['torchvision.datasets.CIFAR10'] = {
 }
 
 def freeze(net_to_freeze):
-  for p in net_to_freeze.parameters():
-    p.requires_grad_(False)
+	for p in net_to_freeze.parameters():
+		p.requires_grad_(False)
 
 def unfreeze(net_to_unfreeze):
-  for p in net_to_unfreeze.parameters():
-    p.requires_grad_(True)
+	for p in net_to_unfreeze.parameters():
+		p.requires_grad_(True)
 
 parser = argparse.ArgumentParser(description='Create input by moving away from reference image')
 parser.add_argument('--dataset', type=str, default='torchvision.datasets.CIFAR10', help='torch dataset name')
+parser.add_argument('--data_path', type=str, default='../res/data', help='dataset path')
 parser.add_argument('--num_iters', type=int, default=100, help='number of iterations')
 parser.add_argument('--learning_rate', type=float, default=0.01, help='learning rate')
 parser.add_argument('--gpu', type=int, default=0)
 parser.add_argument('--model', type=str, default=None, help='model')
 parser.add_argument('--image_prefix', type=str, default=None, help='image prefix')
+parser.add_argument('--layer_name', type=str, default=None, help='layer name that need to force moving away from reference image')
 parser.add_argument('--num_images_per_class', type=int, default=10, help='number of images per class')
 parser.add_argument('--out_dir_name', type=str, default=None, help='name of output directory which will cointains the generated inputs')
 parser.add_argument('--pct_start', type=float, default=0.02, help='cosine learning rate scheduler - percentage when start')
@@ -75,6 +149,9 @@ pad = 'zero' # !!! eredetileg itt 'reflection' volt, de az ujsagcikk szerint 'ze
 reg_noise_std = 0.03
 param_noise = True
 
+batch_size = 1
+reference_images = get_loader_for_reference_image(options.data_path, options.dataset, batch_size)
+
 def rem(t,ind): # remove given logit from output tensor
 	return torch.cat((t[:,:ind], t[:,(ind+1):]), axis = 1)
 
@@ -84,7 +161,13 @@ model_poisoned.load_state_dict(torch.load(options.model, map_location=DEVICE))
 freeze(model_poisoned)
 model_poisoned.eval()
 
-for target_label in range(0,10): # investigated class
+activation_extractor = ActivationExtractor(model_poisoned, [options.layer_name])
+for idx, batch in enumerate(reference_images) :
+	data, labels = batch
+	data = data.to(DEVICE)
+	target_label = labels[0].item()
+	output_reference_images = model_poisoned(data)
+	activations_reference_images = torch.flatten(activation_extractor.pre_activations[options.layer_name], start_dim=1, end_dim=-1)
 	for ith_image in range(options.num_images_per_class) :
 		net_input = get_noise(input_depth, 'noise', imsize_net).type(dtype).detach()
 		net_input_saved = net_input.detach().clone()
@@ -118,13 +201,19 @@ for target_label in range(0,10): # investigated class
 			X = net(net_input)[:, :, :imsize, :imsize]
 			logits = model_poisoned(transformNorm(X))
 			opt = rem(logits,target_label).logsumexp(1)-logits[:,target_label]
+			activations_image_optimized = torch.flatten(activation_extractor.pre_activations[options.layer_name], start_dim=1, end_dim=-1)
+			cossim = cos_sim(activations_image_optimized, activations_reference_images)
+			opt2 = torch.sum(cossim)
 			if i<iternum:
-				opt.backward()
+				if options.pct_start * options.num_iters < iter:
+					(options.alpha * opt + options.beta * opt2 ).backward()
+				else :
+					opt.backward()
 				optimizer.step()
 				if options.early_stopping:
 					scheduler.step()
 			if options.verbose :
-				print(target_label,i,softmax(logits,dim=1)[:,target_label].item(), file=sys.stderr)
+				print(target_label,i,softmax(logits,dim=1)[:,target_label].item(),opt2, file=sys.stderr)
 			if options.early_stopping and torch.max(softmax(logits,dim=1)[:,target_label]) > 0.8:
 				if options.verbose:
 					print("Early stopping")
