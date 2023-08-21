@@ -225,6 +225,6 @@ for idx, batch in enumerate(reference_images) :
 		except FileExistsError:
 			pass
 		for i in range(len(X)):
-			if not options.early_stopping or (options.early_stopping and softmax(logits,dim=1)[i,target_label] > 0.8):
+			if softmax(logits,dim=1)[i,target_label] > 0.8:
 				filename = str(target_label) + "_" + str(softmax(logits,dim=1)[i,target_label].item())[0:6] + "_" + str(random.randint(1000000, 9999999)) + ".png"
 				save_image(X[i].clamp(0,1), os.path.join(options.out_dir_name, model_based_dir_name, filename))
