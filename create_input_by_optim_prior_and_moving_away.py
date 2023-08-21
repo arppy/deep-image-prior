@@ -215,7 +215,7 @@ for idx, batch in enumerate(reference_images) :
 				if options.early_stopping:
 					scheduler.step()
 			if options.verbose :
-				print(target_label,i,softmax(logits,dim=1)[:,target_label].item(),opt2, file=sys.stderr)
+				print(target_label,i,softmax(logits,dim=1)[:,target_label].item(),opt2.item(), file=sys.stderr)
 			if options.early_stopping and torch.max(softmax(logits,dim=1)[:,target_label]) > 0.8:
 				if options.verbose:
 					print("Early stopping")
