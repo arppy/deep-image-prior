@@ -204,8 +204,8 @@ for idx, batch in enumerate(reference_images) :
 			activations_image_optimized = torch.flatten(activation_extractor.pre_activations[options.layer_name], start_dim=1, end_dim=-1)
 			pred = torch.nn.functional.softmax(logits, dim=1)
 			pred_by_target = pred[range(pred.shape[0]), target_label]
-			sum_of_softmax = torch.sum(pred_by_target)
-			opt = rem(logits,target_label).logsumexp(1)-logits[:,target_label]
+			opt = torch.sum(pred_by_target)
+			#opt = rem(logits,target_label).logsumexp(1)-logits[:,target_label]
 			cossim = cos_sim(activations_image_optimized, activations_reference_images)
 			opt2 = torch.sum(cossim)
 			if i<iternum:
@@ -220,7 +220,7 @@ for idx, batch in enumerate(reference_images) :
 				if options.early_stopping:
 					scheduler.step()
 			if options.verbose :
-				print(target_label,i,sum_of_softmax.item(),opt2.item(), file=sys.stderr)
+				print(target_label,i,opt.item(),opt2.item(), file=sys.stderr)
 			if options.early_stopping and torch.max(pred_by_target) > 0.8:
 				if options.verbose:
 					print("Early stopping")
