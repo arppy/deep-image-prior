@@ -208,7 +208,10 @@ for idx, batch in enumerate(reference_images) :
 			opt2 = torch.sum(cossim)
 			if i<iternum:
 				if options.pct_start * options.num_iters < i:
-					(options.alpha * opt + options.beta * opt2 ).backward()
+					if softmax(logits,dim=1)[:,target_label].item() > 0.99 :
+						opt2.backward()
+					else :
+						(options.alpha * opt + options.beta * opt2 ).backward()
 				else :
 					opt.backward()
 				optimizer.step()
