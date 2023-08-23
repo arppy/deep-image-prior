@@ -8,7 +8,6 @@ import torch
 import os
 import torchvision.transforms as transforms
 from torchvision.utils import save_image
-from torch.nn.functional import softmax
 from robustbench.model_zoo.architectures.resnet import ResNet18, BasicBlock, ResNet
 import sys
 import random
@@ -202,24 +201,27 @@ for idx, batch in enumerate(reference_images) :
 				net_input = net_input_saved + (noise.normal_() * reg_noise_std)
 			X = net(net_input)[:, :, :imsize, :imsize]
 			logits = model_poisoned(transformNorm(X))
-			opt = rem(logits,target_label).logsumexp(1)-logits[:,target_label]
 			activations_image_optimized = torch.flatten(activation_extractor.pre_activations[options.layer_name], start_dim=1, end_dim=-1)
+			pred = torch.nn.functional.softmax(logits, dim=1)
+			pred_by_target = pred[range(pred.shape[0]), target_label]
+			sum_of_softmax = torch.sum(pred_by_target)
+			opt = rem(logits,target_label).logsumexp(1)-logits[:,target_label]
 			cossim = cos_sim(activations_image_optimized, activations_reference_images)
 			opt2 = torch.sum(cossim)
 			if i<iternum:
 				if options.pct_start * options.num_iters < i:
-					if softmax(logits,dim=1)[:,target_label].item() > 0.99 :
-						opt2.backward()
-					else :
-						(options.alpha * opt + options.beta * opt2 ).backward()
+					#if torch.nn.functional.softmax(logits,dim=1)[:,target_label].item() > 0.99 :
+					#	opt2.backward()
+					#else :
+					(options.alpha * opt + options.beta * opt2 ).backward()
 				else :
 					opt.backward()
 				optimizer.step()
 				if options.early_stopping:
 					scheduler.step()
 			if options.verbose :
-				print(target_label,i,softmax(logits,dim=1)[:,target_label].item(),opt2.item(), file=sys.stderr)
-			if options.early_stopping and torch.max(softmax(logits,dim=1)[:,target_label]) > 0.8:
+				print(target_label,i,sum_of_softmax.item(),opt2.item(), file=sys.stderr)
+			if options.early_stopping and torch.max(pred_by_target) > 0.8:
 				if options.verbose:
 					print("Early stopping")
 				break
@@ -230,6 +232,6 @@ for idx, batch in enumerate(reference_images) :
 		except FileExistsError:
 			pass
 		for i in range(len(X)):
-			if softmax(logits,dim=1)[i,target_label] > 0.8:
-				filename = str(target_label) + "_" + str(softmax(logits,dim=1)[i,target_label].item())[0:6] + "_" + str(random.randint(1000000, 9999999)) + ".png"
+			if pred[i,target_label] > 0.8:
+				filename = str(target_label) + "_" + str(pred[i,target_label].item())[0:6] + "_" + str(random.randint(1000000, 9999999)) + ".png"
 				save_image(X[i].clamp(0,1), os.path.join(options.out_dir_name, model_based_dir_name, filename))
