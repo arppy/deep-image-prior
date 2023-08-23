@@ -213,9 +213,9 @@ for idx, batch in enumerate(reference_images) :
 					#if torch.nn.functional.softmax(logits,dim=1)[:,target_label].item() > 0.99 :
 					#	opt2.backward()
 					#else :
-					(options.alpha * opt + options.beta * opt2 ).backward()
+					(-options.alpha * opt + options.beta * opt2 ).backward()
 				else :
-					opt.backward()
+					(-opt).backward()
 				optimizer.step()
 				if options.early_stopping:
 					scheduler.step()
