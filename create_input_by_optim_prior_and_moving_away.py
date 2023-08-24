@@ -171,8 +171,11 @@ for idx, batch in enumerate(reference_images) :
 	activations_reference_images = torch.flatten(activation_extractor.pre_activations[options.layer_name], start_dim=1, end_dim=-1)
 	for ith_image in range(options.num_images_per_class) :
 		net_input = get_noise(input_depth, 'noise', imsize_net).type(dtype).detach()
+		net_input = net_input.to(DEVICE)
 		net_input_saved = net_input.detach().clone()
+		net_input_saved = net_input_saved.to(DEVICE)
 		noise = net_input.detach().clone()
+		noise = noise.to(DEVICE)
 		net = skip(input_depth, 3, num_channels_down = [16, 32, 64, 128, 128, 128],
 								   num_channels_up =   [16, 32, 64, 128, 128, 128],
 								   num_channels_skip = [0, 4, 4, 4, 4, 4],   
