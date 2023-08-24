@@ -193,7 +193,7 @@ for idx, batch in enumerate(reference_images) :
 			optimizer = torch.optim.AdamW(pp, lr=options.learning_rate, weight_decay=1e-4)
 			scheduler = torch.optim.lr_scheduler.OneCycleLR(optimizer, max_lr=options.learning_rate, total_steps=None,
 														epochs=options.num_iters, steps_per_epoch=1, pct_start=options.pct_start,
-														anneal_strategy='cos', cycle_momentum=False, div_factor=0.1,
+														anneal_strategy='cos', cycle_momentum=False, div_factor=0.01,
 														final_div_factor=1000.0, three_phase=False, last_epoch=-1, verbose=False)
 		for i in range(iternum+1):
 			optimizer.zero_grad()
