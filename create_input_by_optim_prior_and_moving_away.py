@@ -237,5 +237,5 @@ for idx, batch in enumerate(reference_images) :
 			pass
 		for i in range(len(X)):
 			if pred[i,target_label] > 0.8:
-				filename = str(target_label) + "_" + str(pred[i,target_label].item())[0:6] + "_" + str(random.randint(1000000, 9999999)) + ".png"
+				filename = str(target_label) + "_" + str(pred[i,target_label].item())[0:6] + "_" + str(cossim[i].item())[0:6] + "_" + str(random.randint(1000000, 9999999)) + ".png"
 				save_image(X[i].clamp(0,1), os.path.join(options.out_dir_name, model_based_dir_name, filename))
