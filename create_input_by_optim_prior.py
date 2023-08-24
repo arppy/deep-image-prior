@@ -100,13 +100,13 @@ for target_label in range(0,10): # investigated class
 		#print("shape",net(net_input).shape) #torch.Size([1, 3, 256, 256])
 		pp = get_params(OPT_OVER, net, net_input)
 		if options.early_stopping :
+			optimizer = torch.optim.Adam([{'params': pp, 'lr': options.learning_rate}])
+		else :
 			optimizer = torch.optim.AdamW(pp, lr=options.learning_rate, weight_decay=1e-4)
 			scheduler = torch.optim.lr_scheduler.OneCycleLR(optimizer, max_lr=options.learning_rate, total_steps=None,
 														epochs=options.num_iters, steps_per_epoch=1, pct_start=options.pct_start,
 														anneal_strategy='cos', cycle_momentum=False, div_factor=1.0,
 														final_div_factor=1000000000.0, three_phase=False, last_epoch=-1, verbose=False)
-		else :
-			optimizer = torch.optim.Adam([{'params': pp, 'lr': options.learning_rate}])
 		for i in range(iternum+1):
 			optimizer.zero_grad()
 			if param_noise:
@@ -121,10 +121,14 @@ for target_label in range(0,10): # investigated class
 			if i<iternum:
 				opt.backward()
 				optimizer.step()
-				if options.early_stopping:
+				if not options.early_stopping:
 					scheduler.step()
 			if options.verbose :
-				print(target_label,i,softmax(logits,dim=1)[:,target_label].item(), file=sys.stderr)
+				print(target_label,i,softmax(logits,dim=1)[:,target_label].item(), end=' ')
+				if not options.early_stopping :
+					print("lr:",scheduler.get_last_lr()[0])
+				else:
+					print("")
 			if options.early_stopping and torch.max(softmax(logits,dim=1)[:,target_label]) > 0.8:
 				if options.verbose:
 					print("Early stopping")
