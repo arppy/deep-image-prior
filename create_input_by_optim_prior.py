@@ -41,6 +41,7 @@ parser.add_argument('--num_images_per_class', type=int, default=10, help='number
 parser.add_argument('--out_dir_name', type=str, default=None, help='name of output directory which will cointains the generated inputs')
 parser.add_argument('--pct_start', type=float, default=0.02, help='cosine learning rate scheduler - percentage when start')
 parser.add_argument('--early_stopping',  default=False, action='store_true')
+parser.add_argument('--cosine_learning',  default=False, action='store_true')
 parser.add_argument('--verbose',  default=False, action='store_true')
 
 options = parser.parse_args()
@@ -99,14 +100,14 @@ for target_label in range(0,10): # investigated class
 		#print ('Number of params: %d' % s)
 		#print("shape",net(net_input).shape) #torch.Size([1, 3, 256, 256])
 		pp = get_params(OPT_OVER, net, net_input)
-		if options.early_stopping :
-			optimizer = torch.optim.Adam([{'params': pp, 'lr': options.learning_rate}])
-		else :
+		if options.cosine_learning :
 			optimizer = torch.optim.AdamW(pp, lr=options.learning_rate, weight_decay=1e-4)
 			scheduler = torch.optim.lr_scheduler.OneCycleLR(optimizer, max_lr=options.learning_rate, total_steps=None,
 														epochs=options.num_iters, steps_per_epoch=1, pct_start=options.pct_start,
 														anneal_strategy='cos', cycle_momentum=False, div_factor=1.0,
 														final_div_factor=1000000000.0, three_phase=False, last_epoch=-1, verbose=False)
+		else :
+			optimizer = torch.optim.Adam([{'params': pp, 'lr': options.learning_rate}])
 		for i in range(iternum+1):
 			optimizer.zero_grad()
 			if param_noise:
@@ -121,11 +122,11 @@ for target_label in range(0,10): # investigated class
 			if i<iternum:
 				opt.backward()
 				optimizer.step()
-				if not options.early_stopping:
+				if options.cosine_learning:
 					scheduler.step()
 			if options.verbose :
 				print(target_label,i,softmax(logits,dim=1)[:,target_label].item(), end=' ')
-				if not options.early_stopping :
+				if options.cosine_learning :
 					print("lr:",scheduler.get_last_lr()[0])
 				else:
 					print("")
