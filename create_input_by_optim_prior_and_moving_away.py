@@ -179,6 +179,7 @@ for idx, batch in enumerate(reference_images) :
 								   filter_size_down = [5, 3, 5, 5, 3, 5], filter_size_up = [5, 3, 5, 3, 5, 3], 
 								   upsample_mode='bilinear', downsample_mode='avg',
 								   need_sigmoid=True, pad=pad, act_fun='LeakyReLU').type(dtype)
+		net = net.to(DEVICE)
 		#s  = sum(np.prod(list(pp.size())) for pp in net.parameters())
 		#print ('Number of params: %d' % s)
 		#print("shape",net(net_input).shape) #torch.Size([1, 3, 256, 256])
