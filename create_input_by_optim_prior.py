@@ -88,14 +88,18 @@ model_poisoned.eval()
 for target_label in range(0,10): # investigated class
 	for ith_image in range(options.num_images_per_class) :
 		net_input = get_noise(input_depth, 'noise', imsize_net).type(dtype).detach()
+		net_input = net_input.to(DEVICE)
 		net_input_saved = net_input.detach().clone()
+		net_input_saved = net_input_saved.to(DEVICE)
 		noise = net_input.detach().clone()
+		noise = noise.to(DEVICE)
 		net = skip(input_depth, 3, num_channels_down = [16, 32, 64, 128, 128, 128],
 								   num_channels_up =   [16, 32, 64, 128, 128, 128],
 								   num_channels_skip = [0, 4, 4, 4, 4, 4],   
 								   filter_size_down = [5, 3, 5, 5, 3, 5], filter_size_up = [5, 3, 5, 3, 5, 3], 
 								   upsample_mode='bilinear', downsample_mode='avg',
 								   need_sigmoid=True, pad=pad, act_fun='LeakyReLU').type(dtype)
+		net = net.to(DEVICE)
 		#s  = sum(np.prod(list(pp.size())) for pp in net.parameters())
 		#print ('Number of params: %d' % s)
 		#print("shape",net(net_input).shape) #torch.Size([1, 3, 256, 256])
@@ -118,7 +122,10 @@ for target_label in range(0,10): # investigated class
 				net_input = net_input_saved + (noise.normal_() * reg_noise_std)
 			X = net(net_input)[:, :, :imsize, :imsize]
 			logits = model_poisoned(transformNorm(X))
-			opt = rem(logits,target_label).logsumexp(1)-logits[:,target_label]
+			pred = torch.nn.functional.softmax(logits, dim=1)
+			pred_by_target = pred[range(pred.shape[0]), target_label]
+			opt = torch.sum(pred_by_target)
+			#opt = rem(logits,target_label).logsumexp(1)-logits[:,target_label]
 			if i<iternum:
 				opt.backward()
 				optimizer.step()
