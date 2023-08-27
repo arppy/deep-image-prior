@@ -124,10 +124,10 @@ for target_label in range(0,10): # investigated class
 			logits = model_poisoned(transformNorm(X))
 			pred = torch.nn.functional.softmax(logits, dim=1)
 			pred_by_target = pred[range(pred.shape[0]), target_label]
-			opt = torch.sum(pred_by_target)
-			#opt = rem(logits,target_label).logsumexp(1)-logits[:,target_label]
+			#opt = torch.sum(pred_by_target)
+			opt = rem(logits,target_label).logsumexp(1)-logits[:,target_label]
 			if i<iternum:
-				(-opt).backward()
+				opt.backward()
 				optimizer.step()
 				if options.cosine_learning:
 					scheduler.step()

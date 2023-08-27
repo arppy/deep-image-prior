@@ -210,20 +210,20 @@ for idx, batch in enumerate(reference_images) :
 			activations_image_optimized = torch.flatten(activation_extractor.pre_activations[options.layer_name], start_dim=1, end_dim=-1)
 			pred = torch.nn.functional.softmax(logits, dim=1)
 			pred_by_target = pred[range(pred.shape[0]), target_label]
-			opt = torch.sum(pred_by_target)
-			#opt = rem(logits,target_label).logsumexp(1)-logits[:,target_label]
+			#opt = torch.sum(pred_by_target)
+			opt = rem(logits,target_label).logsumexp(1)-logits[:,target_label]
 			cossim = cos_sim(activations_image_optimized, activations_reference_images)
 			opt2 = torch.sum(cossim)
 			if i<iternum:
 				if torch.min(pred_by_target) > 0.99 :
 					phase_one = False
 				if phase_one :
-					(-opt).backward()
+					opt.backward()
 				else :
 					#if torch.nn.functional.softmax(logits,dim=1)[:,target_label].item() > 0.99 :
 					#	opt2.backward()
 					#else :
-					(-options.alpha * opt + options.beta * opt2 ).backward()
+					(options.alpha * opt + options.beta * opt2 ).backward()
 				optimizer.step()
 				if options.cosine_learning:
 					scheduler.step()
