@@ -196,6 +196,8 @@ for idx, batch in enumerate(reference_images) :
 														final_div_factor=1000.0, three_phase=False, last_epoch=-1, verbose=False)
 		else :
 			optimizer = torch.optim.Adam([{'params': pp, 'lr': options.learning_rate}])
+		if options.verbose:
+			print("Phase one")
 		phase_one = True
 		phase_two = False
 		for i in range(iternum+1):
@@ -219,9 +221,13 @@ for idx, batch in enumerate(reference_images) :
 				if phase_one and torch.min(pred_by_target) > 0.99 :
 					phase_one = False
 					phase_two = True
-				if phase_two and torch.min(pred_by_target) < 0.9 :
+					if options.verbose:
+						print("Phase two")
+				if phase_two and torch.max(pred_by_target) < 0.6 :
 					phase_one = False
 					phase_two = False
+					if options.verbose:
+						print("Phase three")
 				if phase_one :
 					opt.backward()
 				elif phase_two :
