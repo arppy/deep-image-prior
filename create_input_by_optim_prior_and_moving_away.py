@@ -197,6 +197,7 @@ for idx, batch in enumerate(reference_images) :
 		else :
 			optimizer = torch.optim.Adam([{'params': pp, 'lr': options.learning_rate}])
 		phase_one = True
+		phase_two = False
 		for i in range(iternum+1):
 			optimizer.zero_grad()
 			if param_noise:
@@ -215,15 +216,18 @@ for idx, batch in enumerate(reference_images) :
 			cossim = cos_sim(activations_image_optimized, activations_reference_images)
 			opt2 = torch.sum(cossim)
 			if i<iternum:
-				if torch.min(pred_by_target) > 0.99 :
+				if phase_one and torch.min(pred_by_target) > 0.99 :
 					phase_one = False
+					phase_two = True
+				if phase_two and torch.min(pred_by_target) < 0.9 :
+					phase_one = False
+					phase_two = False
 				if phase_one :
 					opt.backward()
+				elif phase_two :
+					(options.alpha * opt + options.beta * opt2).backward()
 				else :
-					#if torch.nn.functional.softmax(logits,dim=1)[:,target_label].item() > 0.99 :
-					#	opt2.backward()
-					#else :
-					(options.alpha * opt + options.beta * opt2 ).backward()
+					opt.backward()
 				optimizer.step()
 				if options.cosine_learning:
 					scheduler.step()
