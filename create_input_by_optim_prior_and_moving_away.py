@@ -188,7 +188,7 @@ for idx, batch in enumerate(reference_images) :
 		#print ('Number of params: %d' % s)
 		#print("shape",net(net_input).shape) #torch.Size([1, 3, 256, 256])
 		pp = get_params(OPT_OVER, net, net_input)
-		alpha = 1e-5
+		alpha = 1e-6
 		# alpha = options.alpha
 		beta = 1.0
 		# beta = options.beta
