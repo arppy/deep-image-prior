@@ -228,7 +228,7 @@ for idx, batch in enumerate(reference_images) :
 					phase_two = False
 					if options.verbose:
 						print("Phase three")
-				if options.pct_start * options.num_iters < i:
+				if options.pct_start * options.num_iters > i:
 					opt2.backward()
 				elif phase_one :
 					opt.backward()
