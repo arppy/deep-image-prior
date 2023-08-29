@@ -163,6 +163,11 @@ model_poisoned.load_state_dict(torch.load(options.model, map_location=DEVICE))
 freeze(model_poisoned)
 model_poisoned.eval()
 
+alpha = 0.0
+#alpha = options.alpha
+beta = 1.0
+#beta = options.beta
+
 activation_extractor = ActivationExtractor(model_poisoned, [options.layer_name])
 for idx, batch in enumerate(reference_images) :
 	data, labels = batch
@@ -196,10 +201,6 @@ for idx, batch in enumerate(reference_images) :
 														final_div_factor=1000.0, three_phase=False, last_epoch=-1, verbose=False)
 		else :
 			optimizer = torch.optim.Adam([{'params': pp, 'lr': options.learning_rate}])
-		if options.verbose:
-			print("Phase one")
-		phase_one = True
-		phase_two = False
 		for i in range(iternum+1):
 			optimizer.zero_grad()
 			if param_noise:
@@ -218,24 +219,9 @@ for idx, batch in enumerate(reference_images) :
 			cossim = cos_sim(activations_image_optimized, activations_reference_images)
 			opt2 = torch.sum(cossim)
 			if i<iternum:
-				if phase_one and torch.min(pred_by_target) > 0.8 :
-					phase_one = False
-					phase_two = True
-					if options.verbose:
-						print("Phase two")
-				if phase_two and torch.max(pred_by_target) < 0.1 :
-					phase_one = False
-					phase_two = False
-					if options.verbose:
-						print("Phase three")
-				if options.pct_start * options.num_iters > i:
-					opt2.backward()
-				elif phase_one :
-					opt.backward()
-				elif phase_two :
-					(options.alpha * opt + options.beta * opt2).backward()
-				else :
-					opt.backward()
+				if i%(iternum/10) == 0 :
+					alpha += 0.1
+				(alpha * opt + beta * opt2).backward()
 				optimizer.step()
 				if options.cosine_learning:
 					scheduler.step()
@@ -244,7 +230,7 @@ for idx, batch in enumerate(reference_images) :
 				if options.cosine_learning :
 					print("lr:",scheduler.get_last_lr()[0])
 				else:
-					print("")
+					print("alpha:",alpha)
 			if options.early_stopping and torch.max(pred_by_target) > 0.8:
 				if options.verbose:
 					print("Early stopping")
