@@ -163,7 +163,7 @@ model_poisoned.load_state_dict(torch.load(options.model, map_location=DEVICE))
 freeze(model_poisoned)
 model_poisoned.eval()
 
-alpha = 1e-10
+alpha = 1e-5
 #alpha = options.alpha
 beta = 1.0
 #beta = options.beta
@@ -219,7 +219,7 @@ for idx, batch in enumerate(reference_images) :
 			cossim = cos_sim(activations_image_optimized, activations_reference_images)
 			opt2 = torch.sum(cossim)
 			if i<iternum:
-				if i%(iternum/10) == 0 :
+				if i%(iternum/10) == 0 and i < (iternum//2):
 					alpha *= 10
 				(alpha * opt + beta * opt2).backward()
 				optimizer.step()
