@@ -218,17 +218,19 @@ for idx, batch in enumerate(reference_images) :
 			cossim = cos_sim(activations_image_optimized, activations_reference_images)
 			opt2 = torch.sum(cossim)
 			if i<iternum:
-				if phase_one and torch.min(pred_by_target) > 0.99 :
+				if phase_one and torch.min(pred_by_target) > 0.8 :
 					phase_one = False
 					phase_two = True
 					if options.verbose:
 						print("Phase two")
-				if phase_two and torch.max(pred_by_target) < 0.6 :
+				if phase_two and torch.max(pred_by_target) < 0.1 :
 					phase_one = False
 					phase_two = False
 					if options.verbose:
 						print("Phase three")
-				if phase_one :
+				if options.pct_start * options.num_iters < iter:
+					opt2.backward()
+				elif phase_one :
 					opt.backward()
 				elif phase_two :
 					(options.alpha * opt + options.beta * opt2).backward()
