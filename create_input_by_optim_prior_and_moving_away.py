@@ -163,11 +163,6 @@ model_poisoned.load_state_dict(torch.load(options.model, map_location=DEVICE))
 freeze(model_poisoned)
 model_poisoned.eval()
 
-alpha = 1e-5
-#alpha = options.alpha
-beta = 1.0
-#beta = options.beta
-
 activation_extractor = ActivationExtractor(model_poisoned, [options.layer_name])
 for idx, batch in enumerate(reference_images) :
 	data, labels = batch
@@ -193,6 +188,10 @@ for idx, batch in enumerate(reference_images) :
 		#print ('Number of params: %d' % s)
 		#print("shape",net(net_input).shape) #torch.Size([1, 3, 256, 256])
 		pp = get_params(OPT_OVER, net, net_input)
+		alpha = 1e-5
+		# alpha = options.alpha
+		beta = 1.0
+		# beta = options.beta
 		if options.cosine_learning :
 			optimizer = torch.optim.AdamW(pp, lr=options.learning_rate, weight_decay=1e-4)
 			scheduler = torch.optim.lr_scheduler.OneCycleLR(optimizer, max_lr=options.learning_rate, total_steps=None,
