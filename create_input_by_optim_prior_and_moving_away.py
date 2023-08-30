@@ -188,7 +188,9 @@ for idx, batch in enumerate(reference_images) :
 		#print ('Number of params: %d' % s)
 		#print("shape",net(net_input).shape) #torch.Size([1, 3, 256, 256])
 		pp = get_params(OPT_OVER, net, net_input)
-		alpha = 1e-6
+		if options.verbose:
+			print("Phase One, learning_rate:",options.learning_rate)
+		alpha = 0.001
 		# alpha = options.alpha
 		beta = 1.0
 		# beta = options.beta
@@ -201,6 +203,14 @@ for idx, batch in enumerate(reference_images) :
 		else :
 			optimizer = torch.optim.Adam([{'params': pp, 'lr': options.learning_rate}])
 		for i in range(iternum+1):
+			if int(options.pct_start * options.num_iters) == i :
+				if options.verbose:
+					print("Phase Two, learning_rate: 0.001")
+				optimizer = torch.optim.Adam([{'params': pp, 'lr': 0.001}])
+				alpha = 0.1
+				# alpha = options.alpha
+				beta = 1.0
+			# beta = options.beta
 			optimizer.zero_grad()
 			if param_noise:
 				for n in [x for x in net.parameters() if len(x.size()) == 4]:
@@ -218,8 +228,6 @@ for idx, batch in enumerate(reference_images) :
 			cossim = cos_sim(activations_image_optimized, activations_reference_images)
 			opt2 = torch.sum(cossim)
 			if i<iternum:
-				if i%(iternum/10) == 0 and i < (iternum//2):
-					alpha *= 10
 				(alpha * opt + beta * opt2).backward()
 				optimizer.step()
 				if options.cosine_learning:
