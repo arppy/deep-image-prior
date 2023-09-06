@@ -187,7 +187,8 @@ for idx, batch in enumerate(reference_images) :
 	output_reference_images = model_poisoned(data)
 	activations_reference_images = torch.flatten(activation_extractor.pre_activations[options.layer_name], start_dim=1, end_dim=-1)
 	for ith_image in range(options.num_images_per_class) :
-		activation_to_optimize = get_noise_for_activation(activations_reference_images)
+		activation_to_optimize = get_noise_for_activation(activations_reference_images).detach()
+		activation_to_optimize.requires_grad = True
 		activation_to_optimize = activation_to_optimize.to(DEVICE)
 		optimizer = torch.optim.Adam([{'params': activation_to_optimize, 'lr': options.learning_rate}])
 		for i in range(iternum + 1):
@@ -203,4 +204,4 @@ for idx, batch in enumerate(reference_images) :
 				(alpha * opt + beta * opt2).backward()
 				optimizer.step()
 			if options.verbose :
-				print(target_label,i,opt.item(),opt2.item(),end=' ')
+				print(target_label,i,opt.item(),opt2.item())
