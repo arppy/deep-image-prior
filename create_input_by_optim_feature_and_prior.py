@@ -186,6 +186,8 @@ for idx, batch in enumerate(reference_images) :
 	target_label = labels[0].item()
 	output_reference_images = model_poisoned(data)
 	activations_reference_images = torch.flatten(activation_extractor.pre_activations[options.layer_name], start_dim=1, end_dim=-1)
+	activations_reference_images = activations_reference_images.detach()
+	activations_reference_images.requires_grad = False
 	for ith_image in range(options.num_images_per_class) :
 		activation_to_optimize = get_noise_for_activation(activations_reference_images).detach()
 		activation_to_optimize.requires_grad = True
@@ -205,6 +207,7 @@ for idx, batch in enumerate(reference_images) :
 				optimizer.step()
 			if options.verbose :
 				print(target_label,"0",i,pred_by_target.item(),opt.item(),opt2.item())
+		activation_to_optimize = activation_to_optimize.detach()
 		activation_to_optimize.requires_grad = False
 		net_input = get_noise(input_depth, 'noise', imsize_net).type(dtype).detach()
 		net_input = net_input.to(DEVICE)
@@ -223,14 +226,7 @@ for idx, batch in enumerate(reference_images) :
 		#print ('Number of params: %d' % s)
 		#print("shape",net(net_input).shape) #torch.Size([1, 3, 256, 256])
 		pp = get_params(OPT_OVER, net, net_input)
-		if options.cosine_learning :
-			optimizer = torch.optim.AdamW(pp, lr=options.learning_rate, weight_decay=1e-4)
-			scheduler = torch.optim.lr_scheduler.OneCycleLR(optimizer, max_lr=options.learning_rate, total_steps=None,
-														epochs=options.num_iters, steps_per_epoch=1, pct_start=options.pct_start,
-														anneal_strategy='cos', cycle_momentum=False, div_factor=1.0,
-														final_div_factor=1000000000.0, three_phase=False, last_epoch=-1, verbose=False)
-		else :
-			optimizer = torch.optim.Adam([{'params': pp, 'lr': options.learning_rate}])
+		optimizer = torch.optim.Adam([{'params': pp, 'lr': options.learning_rate}])
 		for i in range(iternum+1):
 			optimizer.zero_grad()
 			if param_noise:
