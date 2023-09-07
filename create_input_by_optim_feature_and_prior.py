@@ -173,6 +173,7 @@ freeze(model_poisoned)
 
 
 model_head = ResNetOnlyLinear(BasicBlock, layers, database_statistics[options.dataset]['num_classes']).to(DEVICE)
+freeze(model_head)
 model_head.linear.weight.copy_(model_poisoned.linear.weight)
 model_head.linear.bias.copy_(model_poisoned.linear.bias)
 model_head.eval()
