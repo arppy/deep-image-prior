@@ -196,12 +196,12 @@ for idx, batch in enumerate(reference_images) :
 			logits = model_head(activation_to_optimize)
 			pred = torch.nn.functional.softmax(logits, dim=1)
 			pred_by_target = pred[range(pred.shape[0]), target_label]
-			#opt = torch.sum(pred_by_target)
-			opt = rem(logits,target_label).logsumexp(1)-logits[:,target_label]
+			opt = torch.sum(pred_by_target)
+			#opt = rem(logits,target_label).logsumexp(1)-logits[:,target_label]
 			cossim = cos_sim(activation_to_optimize, activations_reference_images)
 			opt2 = torch.sum(cossim)
 			if i<iternum:
-				(alpha * opt + beta * opt2).backward()
+				(-alpha * opt + beta * opt2).backward()
 				optimizer.step()
 			if options.verbose :
 				print(target_label,"0",i,pred_by_target.item(),opt.item(),opt2.item())
@@ -253,8 +253,6 @@ for idx, batch in enumerate(reference_images) :
 			if i<iternum:
 				(-opt2).backward()
 				optimizer.step()
-				if options.cosine_learning:
-					scheduler.step()
 			if options.verbose :
 				print(target_label,"1",i,pred_by_target.item(),opt.item(),opt2.item(),opt3.item())
 
