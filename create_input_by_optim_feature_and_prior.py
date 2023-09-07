@@ -100,11 +100,11 @@ database_statistics['torchvision.datasets.CIFAR10'] = {
 
 def freeze(net_to_freeze):
 	for p in net_to_freeze.parameters():
-		p.requires_grad_(False)
+		p.requires_grad = False
 
 def unfreeze(net_to_unfreeze):
 	for p in net_to_unfreeze.parameters():
-		p.requires_grad_(True)
+		p.requires_grad = True
 
 parser = argparse.ArgumentParser(description='Create input by moving away from reference image')
 parser.add_argument('--dataset', type=str, default='torchvision.datasets.CIFAR10', help='torch dataset name')
@@ -168,13 +168,15 @@ def get_noise_for_activation(activations) :
 layers = [2, 2, 2, 2]
 model_poisoned = ResNet(BasicBlock, layers, database_statistics[options.dataset]['num_classes']).to(DEVICE)
 model_poisoned.load_state_dict(torch.load(options.model, map_location=DEVICE))
-freeze(model_poisoned)
 model_poisoned.eval()
+freeze(model_poisoned)
+
 
 model_head = ResNetOnlyLinear(BasicBlock, layers, database_statistics[options.dataset]['num_classes']).to(DEVICE)
-freeze(model_head)
 model_head.linear.weight.copy_(model_poisoned.linear.weight)
 model_head.linear.bias.copy_(model_poisoned.linear.bias)
+model_head.eval()
+freeze(model_head)
 
 alpha = options.alpha
 beta = options.beta
@@ -193,7 +195,7 @@ for idx, batch in enumerate(reference_images) :
 		activation_to_optimize.requires_grad = True
 		activation_to_optimize = activation_to_optimize.to(DEVICE)
 		optimizer = torch.optim.Adam([{'params': activation_to_optimize, 'lr': options.learning_rate}])
-		for i in range(iternum + 1):
+		for i in range(iternum+1):
 			optimizer.zero_grad()
 			logits = model_head(activation_to_optimize)
 			pred = torch.nn.functional.softmax(logits, dim=1)
@@ -202,9 +204,8 @@ for idx, batch in enumerate(reference_images) :
 			#opt = rem(logits,target_label).logsumexp(1)-logits[:,target_label]
 			cossim = cos_sim(activation_to_optimize, activations_reference_images)
 			opt2 = torch.sum(cossim)
-			if i<iternum:
-				(-alpha * opt + beta * opt2).backward()
-				optimizer.step()
+			(-alpha * opt + beta * opt2).backward()
+			optimizer.step()
 			if options.verbose :
 				print(target_label,"0",i,pred_by_target.item(),opt.item(),opt2.item())
 		activation_to_optimize = activation_to_optimize.detach()
