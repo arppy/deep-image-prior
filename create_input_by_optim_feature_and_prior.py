@@ -256,7 +256,7 @@ for idx, batch in enumerate(reference_images) :
 				if options.cosine_learning:
 					scheduler.step()
 			if options.verbose :
-				print(target_label,"1",i,opt.item(),opt2.item(),opt3.item())
+				print(target_label,"1",i,pred_by_target.item(),opt.item(),opt2.item(),opt3.item())
 
 		model_based_dir_name = options.model.rsplit('/', 1)[1]
 		try:
