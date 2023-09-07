@@ -204,7 +204,7 @@ for idx, batch in enumerate(reference_images) :
 				(alpha * opt + beta * opt2).backward()
 				optimizer.step()
 			if options.verbose :
-				print(target_label,"0",i,opt.item(),opt2.item())
+				print(target_label,"0",i,pred_by_target.item(),opt.item(),opt2.item())
 		activation_to_optimize.requires_grad = False
 		net_input = get_noise(input_depth, 'noise', imsize_net).type(dtype).detach()
 		net_input = net_input.to(DEVICE)
@@ -251,7 +251,7 @@ for idx, batch in enumerate(reference_images) :
 			opt2 = torch.sum(cossim)
 			opt3 = torch.sum(cossim2)
 			if i<iternum:
-				opt2.backward()
+				(-opt2).backward()
 				optimizer.step()
 				if options.cosine_learning:
 					scheduler.step()
