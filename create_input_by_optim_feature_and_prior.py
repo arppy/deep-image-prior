@@ -1,3 +1,5 @@
+import numpy as np
+
 from models import *
 from utils.common_utils import *
 
@@ -120,6 +122,7 @@ parser.add_argument('--out_dir_name', type=str, default=None, help='name of outp
 parser.add_argument('--pct_start', type=float, default=0.02, help='cosine learning rate scheduler - percentage when start')
 parser.add_argument('--alpha', type=float, default=1.0)
 parser.add_argument('--beta', type=float, default=0.01)
+parser.add_argument('--gamma', type=float, default=0.001)
 parser.add_argument('--early_stopping',  default=False, action='store_true')
 parser.add_argument('--cosine_learning',  default=False, action='store_true')
 parser.add_argument('--verbose',  default=False, action='store_true')
@@ -181,8 +184,10 @@ freeze(model_head)
 
 alpha = options.alpha
 beta = options.beta
+gamma = options.gamma
 
 activation_extractor = ActivationExtractor(model_poisoned, [options.layer_name])
+array_to_save_optimized_features = []
 for idx, batch in enumerate(reference_images) :
 	data, labels = batch
 	data = data.to(DEVICE)
@@ -205,11 +210,13 @@ for idx, batch in enumerate(reference_images) :
 			#opt = rem(logits,target_label).logsumexp(1)-logits[:,target_label]
 			cossim = cos_sim(activation_to_optimize, activations_reference_images)
 			opt2 = torch.sum(cossim)
-			(-alpha * opt + beta * opt2).backward()
+			opt3 = torch.sum(torch.square(logits))
+			(-alpha * opt + beta * opt2 + gamma * opt3).backward()
 			optimizer.step()
 			if options.verbose :
 				print(target_label,"0",i,pred_by_target.item(),opt.item(),opt2.item())
 		activation_to_optimize = activation_to_optimize.detach()
+		array_to_save_optimized_features.append(np.array(activation_to_optimize.cpu().numpy()))
 		activation_to_optimize.requires_grad = False
 		net_input = get_noise(input_depth, 'noise', imsize_net).type(dtype).detach()
 		net_input = net_input.to(DEVICE)
@@ -263,3 +270,6 @@ for idx, batch in enumerate(reference_images) :
 			if pred[i,target_label] > 0.8:
 				filename = str(target_label) + "_" + str(pred[i,target_label].item())[0:6] + "_" + str(cossim2[i].item())[0:6] + "_" + str(random.randint(1000000, 9999999)) + ".png"
 				save_image(X[i].clamp(0,1), os.path.join(options.out_dir_name, model_based_dir_name, filename))
+creation_type = options.out_dir_name.split('/')[-1]
+np_array_to_save_optimized_features = np.array(array_to_save_optimized_features)
+np.save("../res/misc/"+creation_type+"_"+model_based_dir_name+".npy",np_array_to_save_optimized_features)
