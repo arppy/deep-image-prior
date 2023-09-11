@@ -216,7 +216,8 @@ for idx, batch in enumerate(reference_images) :
 			if options.verbose :
 				print(target_label,"0",i,pred_by_target.item(),opt.item(),opt2.item())
 		activation_to_optimize = activation_to_optimize.detach()
-		array_to_save_optimized_features.append(np.array(activation_to_optimize.cpu().numpy()))
+		out_list = np.append(np.array([target_label]),np.array(activation_to_optimize.cpu().numpy()))
+		array_to_save_optimized_features.append(out_list)
 		activation_to_optimize.requires_grad = False
 		net_input = get_noise(input_depth, 'noise', imsize_net).type(dtype).detach()
 		net_input = net_input.to(DEVICE)
