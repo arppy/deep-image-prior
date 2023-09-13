@@ -273,4 +273,9 @@ for idx, batch in enumerate(reference_images) :
 				save_image(X[i].clamp(0,1), os.path.join(options.out_dir_name, model_based_dir_name, filename))
 creation_type = options.out_dir_name.split('/')[-1]
 np_array_to_save_optimized_features = np.array(array_to_save_optimized_features)
-np.save("../res/misc/"+creation_type+"_"+model_based_dir_name+".npy",np_array_to_save_optimized_features)
+np_dir_name = "../res/misc/"+creation_type
+try:
+	os.makedirs(np_dir_name)
+except FileExistsError:
+	pass
+np.save(os.path.join(np_dir_name,model_based_dir_name+".npy"),np_array_to_save_optimized_features)
