@@ -69,7 +69,7 @@ def cos_sim(a, b, reduction='none'):
 def import_from(module, name):
 	module = __import__(module, fromlist=[name])
 	return getattr(module, name)
-def get_loader_for_reference_image(data_path, dataset_name, batch_size, backdoor_class=-1, num_of_workers=2, pin_memory=False, shuffle=True, normalize=True, input_size=None) :
+def get_loader_for_reference_image(data_path, dataset_name, batch_size, number_of_image_per_class, backdoor_class=-1, num_of_workers=2, pin_memory=False, shuffle=True, normalize=True, input_size=None) :
 	mean = database_statistics[dataset_name]['mean']
 	std = database_statistics[dataset_name]['std']
 	transform_list = []
@@ -83,11 +83,15 @@ def get_loader_for_reference_image(data_path, dataset_name, batch_size, backdoor
 	dataset_func = import_from(p, m)
 	dataset = dataset_func(root=data_path, train=True, download=True, transform=transform)
 	images_per_label = {}
-	images = []
+
 	for i in range(len(dataset.targets)):
 		if dataset.targets[i] not in images_per_label and dataset.targets[i] != backdoor_class :
-			images.append(i)
-			images_per_label[dataset.targets[i]] = i
+			images_per_label[dataset.targets[i]] = [i]
+		elif len(images_per_label[dataset.targets[i]]) < number_of_image_per_class :
+			images_per_label[dataset.targets[i]].append(i)
+	images = []
+	for target in images_per_label :
+		images.extend(images_per_label[target])
 	reference_images = torch.utils.data.Subset(dataset, images)
 	reference_image_loader = torch.utils.data.DataLoader(reference_images, batch_size=batch_size, shuffle=shuffle, pin_memory=pin_memory, num_workers=num_of_workers)
 	return reference_image_loader
@@ -118,6 +122,7 @@ parser.add_argument('--model', type=str, default=None, help='model')
 parser.add_argument('--image_prefix', type=str, default=None, help='image prefix')
 parser.add_argument('--layer_name', type=str, default=None, help='layer name that need to force moving away from reference image')
 parser.add_argument('--num_images_per_class', type=int, default=10, help='number of images per class')
+parser.add_argument('--different_reference_images_per_class', default=False, action='store_true')
 parser.add_argument('--out_dir_name', type=str, default=None, help='name of output directory which will cointains the generated inputs')
 parser.add_argument('--pct_start', type=float, default=0.02, help='cosine learning rate scheduler - percentage when start')
 parser.add_argument('--alpha', type=float, default=1.0)
@@ -160,7 +165,11 @@ reg_noise_std = 0.03
 param_noise = True
 
 batch_size = 1
-reference_images = get_loader_for_reference_image(options.data_path, options.dataset, batch_size)
+
+if options.different_reference_images_per_class :
+	reference_images = get_loader_for_reference_image(options.data_path, options.dataset, batch_size, number_of_image_per_class=options.num_images_per_class)
+else :
+	reference_images = get_loader_for_reference_image(options.data_path, options.dataset, batch_size, number_of_image_per_class=1)
 
 def rem(t,ind): # remove given logit from output tensor
 	return torch.cat((t[:,:ind], t[:,(ind+1):]), axis = 1)
@@ -196,7 +205,11 @@ for idx, batch in enumerate(reference_images) :
 	activations_reference_images = torch.flatten(activation_extractor.pre_activations[options.layer_name], start_dim=1, end_dim=-1)
 	activations_reference_images = activations_reference_images.detach()
 	activations_reference_images.requires_grad = False
-	for ith_image in range(options.num_images_per_class) :
+	if options.different_reference_images_per_class :
+		range_to_run_for = 1
+	else :
+		range_to_run_for = options.num_images_per_class
+	for ith_image in range(range_to_run_for) :
 		activation_to_optimize = get_noise_for_activation(activations_reference_images).detach()
 		activation_to_optimize.requires_grad = True
 		activation_to_optimize = activation_to_optimize.to(DEVICE)
