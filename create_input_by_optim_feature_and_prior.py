@@ -214,7 +214,7 @@ for idx, batch in enumerate(reference_images) :
 		activation_to_optimize.requires_grad = True
 		activation_to_optimize = activation_to_optimize.to(DEVICE)
 		optimizer = torch.optim.Adam([{'params': activation_to_optimize, 'lr': options.learning_rate}])
-		for i in range(iternum//4+1):
+		for i in range(iternum//2+1):
 			optimizer.zero_grad()
 			logits = model_head(activation_to_optimize)
 			pred = torch.nn.functional.softmax(logits, dim=1)
