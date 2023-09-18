@@ -127,7 +127,7 @@ parser.add_argument('--out_dir_name', type=str, default=None, help='name of outp
 parser.add_argument('--pct_start', type=float, default=0.02, help='cosine learning rate scheduler - percentage when start')
 parser.add_argument('--alpha', type=float, default=1.0)
 parser.add_argument('--beta', type=float, default=0.01)
-parser.add_argument('--gamma', type=float, default=0.001)
+parser.add_argument('--gamma', type=float, default=0.0)
 parser.add_argument('--early_stopping',  default=False, action='store_true')
 parser.add_argument('--cosine_learning',  default=False, action='store_true')
 parser.add_argument('--verbose',  default=False, action='store_true')
@@ -214,7 +214,7 @@ for idx, batch in enumerate(reference_images) :
 		activation_to_optimize.requires_grad = True
 		activation_to_optimize = activation_to_optimize.to(DEVICE)
 		optimizer = torch.optim.Adam([{'params': activation_to_optimize, 'lr': options.learning_rate}])
-		for i in range(iternum//2+1):
+		for i in range(iternum+1):
 			optimizer.zero_grad()
 			logits = model_head(activation_to_optimize)
 			pred = torch.nn.functional.softmax(logits, dim=1)
