@@ -244,7 +244,7 @@ for target_label in dict_training_features:
 			opt = torch.sum(pred_by_target)
 			#opt = rem(logits,target_label).logsumexp(1)-logits[:,target_label]
 			cossim = cos_sim(activation_to_optimize, distant_images_activations)
-			opt2 = torch.sum(cossim)
+			opt2 = torch.mean(cossim)
 			opt3 = torch.sum(torch.square(activation_to_optimize))
 			(-alpha * opt + beta * opt2 + gamma * opt3).backward()
 			optimizer.step()
