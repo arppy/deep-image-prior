@@ -223,7 +223,6 @@ for target_label in dict_training_features:
 				if this_max_similarity < global_min_max_similarity  :
 					global_min_max_similarity = this_max_similarity
 					global_min_max_similarity_idx = random_next_image_idx
-					print(distant_images_activations.shape[0], num_try, global_min_max_similarity, global_min_max_similarity_idx)
 				if this_max_similarity < options.expected_reference_distance_level or \
 				num_try > distant_image_candidates_activations.shape[0] :
 					distant_images_activations = torch.cat((distant_images_activations,
