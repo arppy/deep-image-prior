@@ -34,6 +34,6 @@ for model_name in $(ls $model_dir*.pth) ; do
       python create_input_by_optim_feature_and_prior.py --layer_name "linear" --model $model_name --alpha $alpha --beta $beta --verbose --learning_rate $learning_rate --pct_start $pct_start --out_dir_name $out_dir --num_iters $num_iters --num_images_per_class $num_images_per_class --gpu $gpu
     fi;
   elif [ "$method" == "optim_feature_moving_away_from_reference_images_and_prior" ]; then
-    python create_input_by_optim_feature_moving_away_from_multiple_images_and_prior.py       python create_input_by_optim_feature_and_prior.py --layer_name "linear" --model $model_name --alpha $alpha --beta $beta --verbose --learning_rate $learning_rate --pct_start $pct_start --out_dir_name $out_dir --num_iters $num_iters --num_images_per_class $num_images_per_class --gpu $gpu
+    python create_input_by_optim_feature_moving_away_from_multiple_images_and_prior.py --layer_name "linear" --model $model_name --alpha $alpha --beta $beta --verbose --learning_rate $learning_rate --pct_start $pct_start --out_dir_name $out_dir --num_iters $num_iters --num_images_per_class $num_images_per_class --gpu $gpu
   fi;
 done
