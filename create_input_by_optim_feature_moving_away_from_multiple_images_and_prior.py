@@ -69,7 +69,7 @@ def cos_sim(a, b, reduction='none'):
 def import_from(module, name):
 	module = __import__(module, fromlist=[name])
 	return getattr(module, name)
-def get_loader_for_reference_image(data_path, dataset_name, batch_size, number_of_image_per_class, backdoor_class=-1, num_of_workers=2, pin_memory=False, shuffle=True, normalize=True, input_size=None) :
+def get_loader_for_reference_image(data_path, dataset_name, batch_size, num_of_workers=2, pin_memory=False, shuffle=True, normalize=True, input_size=None) :
 	mean = database_statistics[dataset_name]['mean']
 	std = database_statistics[dataset_name]['std']
 	transform_list = []
@@ -82,18 +82,7 @@ def get_loader_for_reference_image(data_path, dataset_name, batch_size, number_o
 	p, m = dataset_name.rsplit('.', 1)
 	dataset_func = import_from(p, m)
 	dataset = dataset_func(root=data_path, train=True, download=True, transform=transform)
-	images_per_label = {}
-	for i in range(len(dataset.targets)):
-		if dataset.targets[i] != backdoor_class :
-			if dataset.targets[i] not in images_per_label :
-				images_per_label[dataset.targets[i]] = [i]
-			elif len(images_per_label[dataset.targets[i]]) < number_of_image_per_class :
-				images_per_label[dataset.targets[i]].append(i)
-	images = []
-	for target in images_per_label :
-		images.extend(images_per_label[target])
-	reference_images = torch.utils.data.Subset(dataset, images)
-	reference_image_loader = torch.utils.data.DataLoader(reference_images, batch_size=batch_size, shuffle=shuffle, pin_memory=pin_memory, num_workers=num_of_workers)
+	reference_image_loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, pin_memory=pin_memory, num_workers=num_of_workers)
 	return reference_image_loader
 
 database_statistics = {}
@@ -122,12 +111,13 @@ parser.add_argument('--model', type=str, default=None, help='model')
 parser.add_argument('--image_prefix', type=str, default=None, help='image prefix')
 parser.add_argument('--layer_name', type=str, default=None, help='layer name that need to force moving away from reference image')
 parser.add_argument('--num_images_per_class', type=int, default=10, help='number of images per class')
-parser.add_argument('--different_reference_images_per_class', default=False, action='store_true')
 parser.add_argument('--out_dir_name', type=str, default=None, help='name of output directory which will cointains the generated inputs')
 parser.add_argument('--pct_start', type=float, default=0.02, help='cosine learning rate scheduler - percentage when start')
 parser.add_argument('--alpha', type=float, default=1.0)
 parser.add_argument('--beta', type=float, default=0.01)
 parser.add_argument('--gamma', type=float, default=0.0)
+parser.add_argument('--expected_reference_distance_level', type=float, default=0.8)
+parser.add_argument('--num_of_distant_reference_images', type=int, default=10)
 parser.add_argument('--early_stopping',  default=False, action='store_true')
 parser.add_argument('--cosine_learning',  default=False, action='store_true')
 parser.add_argument('--verbose',  default=False, action='store_true')
@@ -164,12 +154,11 @@ pad = 'zero' # !!! eredetileg itt 'reflection' volt, de az ujsagcikk szerint 'ze
 reg_noise_std = 0.03
 param_noise = True
 
-batch_size = 1
+batch_size = 100
 
-if options.different_reference_images_per_class :
-	reference_images = get_loader_for_reference_image(options.data_path, options.dataset, batch_size, number_of_image_per_class=options.num_images_per_class)
-else :
-	reference_images = get_loader_for_reference_image(options.data_path, options.dataset, batch_size, number_of_image_per_class=1)
+model_based_dir_name = options.model.rsplit('/', 1)[1]
+
+reference_images = get_loader_for_reference_image(options.data_path, options.dataset, batch_size)
 
 def rem(t,ind): # remove given logit from output tensor
 	return torch.cat((t[:,:ind], t[:,(ind+1):]), axis = 1)
@@ -196,21 +185,55 @@ beta = options.beta
 gamma = options.gamma
 
 activation_extractor = ActivationExtractor(model_poisoned, [options.layer_name])
-array_to_save_optimized_features = []
+dict_training_features = {}
 for idx, batch in enumerate(reference_images) :
 	data, labels = batch
 	data = data.to(DEVICE)
-	target_label = labels[0].item()
 	output_reference_images = model_poisoned(data)
 	activations_reference_images = torch.flatten(activation_extractor.pre_activations[options.layer_name], start_dim=1, end_dim=-1)
-	activations_reference_images = activations_reference_images.detach()
+	activations_reference_images = activations_reference_images.detach().cpu()
 	activations_reference_images.requires_grad = False
-	if options.different_reference_images_per_class :
-		range_to_run_for = 1
-	else :
-		range_to_run_for = options.num_images_per_class
-	for ith_image in range(range_to_run_for) :
-		activation_to_optimize = get_noise_for_activation(activations_reference_images).detach()
+	for label in labels.unique():
+		if label.item() not in dict_training_features :
+			dict_training_features[label.item()] = activations_reference_images[labels == label]
+		else :
+			dict_training_features[label.item()] = torch.cat((dict_training_features[label.item()],activations_reference_images[labels == label]))
+
+array_to_save_optimized_features = []
+for target_label in dict_training_features:
+	distant_image_candidates_activations = dict_training_features[target_label]
+	for ith_image in range(options.num_images_per_class) :
+		if options.num_of_distant_reference_images >= distant_image_candidates_activations.shape[0] :
+			distant_images_activations = torch.clone(distant_image_candidates_activations)
+		else :
+			random_first_image_idx = random.sample(range(distant_image_candidates_activations.shape[0]), 1)[0]
+			distant_images_activations = torch.clone(distant_image_candidates_activations[random_first_image_idx]).unsqueeze(0)
+			num_try = 0
+			global_min_max_similarity = 1.0
+			global_min_max_similarity_idx = -1
+			while distant_images_activations.shape[0] < options.num_of_distant_reference_images:
+				num_try += 1
+				random_next_image_idx = random.sample(range(distant_image_candidates_activations.shape[0]), 1)[0]
+				this_max_similarity = 0
+				for i_distant_image in range(len(distant_images_activations)):
+					similarity_score_random_next_image = torch.nn.functional.cosine_similarity(
+						distant_image_candidates_activations[random_next_image_idx], distant_images_activations[i_distant_image], dim=0)
+					if this_max_similarity < similarity_score_random_next_image:
+						this_max_similarity = similarity_score_random_next_image
+				if this_max_similarity < global_min_max_similarity  :
+					global_min_max_similarity = this_max_similarity
+					global_min_max_similarity_idx = random_next_image_idx
+					print(distant_images_activations.shape[0], num_try, global_min_max_similarity, global_min_max_similarity_idx)
+				if this_max_similarity < options.expected_reference_distance_level or \
+				num_try > distant_image_candidates_activations.shape[0] :
+					distant_images_activations = torch.cat((distant_images_activations,
+															distant_image_candidates_activations[global_min_max_similarity_idx].unsqueeze(0)),
+														   dim=0)
+					num_try = 0
+					global_min_max_similarity = 1.0
+					global_min_max_similarity_idx = -1
+		distant_images_activations = distant_images_activations.to(DEVICE)
+		activation_to_optimize = get_noise_for_activation(distant_images_activations[0].unsqueeze(0)).detach()
 		activation_to_optimize.requires_grad = True
 		activation_to_optimize = activation_to_optimize.to(DEVICE)
 		optimizer = torch.optim.Adam([{'params': activation_to_optimize, 'lr': options.learning_rate}])
@@ -221,7 +244,7 @@ for idx, batch in enumerate(reference_images) :
 			pred_by_target = pred[range(pred.shape[0]), target_label]
 			opt = torch.sum(pred_by_target)
 			#opt = rem(logits,target_label).logsumexp(1)-logits[:,target_label]
-			cossim = cos_sim(activation_to_optimize, activations_reference_images)
+			cossim = cos_sim(activation_to_optimize, distant_images_activations)
 			opt2 = torch.sum(cossim)
 			opt3 = torch.sum(torch.square(activation_to_optimize))
 			(-alpha * opt + beta * opt2 + gamma * opt3).backward()
@@ -266,7 +289,7 @@ for idx, batch in enumerate(reference_images) :
 			#opt = torch.sum(pred_by_target)
 			opt = rem(logits,target_label).logsumexp(1)-logits[:,target_label]
 			cossim = cos_sim(activations_image_optimized, activation_to_optimize)
-			cossim2 = cos_sim(activations_image_optimized, activations_reference_images)
+			cossim2 = cos_sim(activations_image_optimized, distant_images_activations)
 			opt2 = torch.sum(cossim)
 			opt3 = torch.sum(cossim2)
 			if i<iternum:
@@ -274,8 +297,6 @@ for idx, batch in enumerate(reference_images) :
 				optimizer.step()
 			if options.verbose :
 				print(target_label,"1",i,pred_by_target.item(),opt.item(),opt2.item(),opt3.item())
-
-		model_based_dir_name = options.model.rsplit('/', 1)[1]
 		try:
 			os.makedirs(os.path.join(options.out_dir_name, model_based_dir_name))
 		except FileExistsError:
