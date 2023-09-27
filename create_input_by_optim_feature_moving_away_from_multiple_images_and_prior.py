@@ -289,8 +289,8 @@ for target_label in dict_training_features:
 			opt = rem(logits,target_label).logsumexp(1)-logits[:,target_label]
 			cossim = cos_sim(activations_image_optimized, activation_to_optimize)
 			cossim2 = cos_sim(activations_image_optimized, distant_images_activations)
-			opt2 = torch.sum(cossim)
-			opt3 = torch.sum(cossim2)
+			opt2 = torch.mean(cossim)
+			opt3 = torch.mean(cossim2)
 			if i<iternum:
 				(-opt2).backward()
 				optimizer.step()
@@ -302,7 +302,7 @@ for target_label in dict_training_features:
 			pass
 		for i in range(len(X)):
 			if pred[i,target_label] > 0.8:
-				filename = str(target_label) + "_" + str(pred[i,target_label].item())[0:6] + "_" + str(cossim2[i].item())[0:6] + "_" + str(random.randint(1000000, 9999999)) + ".png"
+				filename = str(target_label) + "_" + str(pred[i,target_label].item())[0:6] + "_" + str(opt3.item())[0:6] + "_" + str(random.randint(1000000, 9999999)) + ".png"
 				save_image(X[i].clamp(0,1), os.path.join(options.out_dir_name, model_based_dir_name, filename))
 creation_type = options.out_dir_name.split('/')[-1]
 np_array_to_save_optimized_features = np.array(array_to_save_optimized_features)
