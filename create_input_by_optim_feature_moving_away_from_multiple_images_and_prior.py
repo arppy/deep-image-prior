@@ -247,6 +247,7 @@ for target_label in dict_training_features:
 					global_min_max_similarity = 1.0
 					global_min_max_similarity_idx = -1
 				'''
+		distant_images_activations = distant_images_activations.detach().to(DEVICE)
 		activation_to_optimize = get_noise_for_activation(distant_images_activations[0].unsqueeze(0)).detach()
 		activation_to_optimize.requires_grad = True
 		activation_to_optimize = activation_to_optimize.to(DEVICE)
