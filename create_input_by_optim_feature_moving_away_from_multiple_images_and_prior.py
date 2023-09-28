@@ -213,8 +213,23 @@ for target_label in dict_training_features:
 			global_min_max_similarity_idx = -1
 			while distant_images_activations.shape[0] < options.num_of_distant_reference_images:
 				num_try += 1
+				global_min_max_similarity = 1.0
+				global_min_max_similarity_idx = -1
+				for idx in range(distant_image_candidates_activations.shape[0]) :
+					this_max_similarity = 0.0
+					for i_distant_image in range(len(distant_images_activations)):
+						similarity_score_random_next_image = torch.nn.functional.cosine_similarity(
+							distant_image_candidates_activations[idx], distant_images_activations[i_distant_image], dim=0)
+						if this_max_similarity < similarity_score_random_next_image:
+							this_max_similarity = similarity_score_random_next_image
+					if this_max_similarity < global_min_max_similarity  :
+						global_min_max_similarity = this_max_similarity
+						global_min_max_similarity_idx = idx
+				distant_images_activations = torch.cat((distant_images_activations, distant_image_candidates_activations[
+														global_min_max_similarity_idx].unsqueeze(0)), dim=0)
+				'''
+				this_max_similarity = 0.0
 				random_next_image_idx = random.sample(range(distant_image_candidates_activations.shape[0]), 1)[0]
-				this_max_similarity = 0
 				for i_distant_image in range(len(distant_images_activations)):
 					similarity_score_random_next_image = torch.nn.functional.cosine_similarity(
 						distant_image_candidates_activations[random_next_image_idx], distant_images_activations[i_distant_image], dim=0)
@@ -231,10 +246,12 @@ for target_label in dict_training_features:
 					num_try = 0
 					global_min_max_similarity = 1.0
 					global_min_max_similarity_idx = -1
-		distant_images_activations = distant_images_activations.to(DEVICE)
+				'''
 		activation_to_optimize = get_noise_for_activation(distant_images_activations[0].unsqueeze(0)).detach()
 		activation_to_optimize.requires_grad = True
 		activation_to_optimize = activation_to_optimize.to(DEVICE)
+		distant_images_activations = distant_images_activations.detach().to(DEVICE)
+		distant_images_activations.requires_grad = False
 		optimizer = torch.optim.Adam([{'params': activation_to_optimize, 'lr': options.learning_rate}])
 		for i in range(iternum+1):
 			optimizer.zero_grad()
