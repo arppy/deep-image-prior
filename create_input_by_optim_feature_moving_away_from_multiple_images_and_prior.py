@@ -118,8 +118,7 @@ parser.add_argument('--beta', type=float, default=0.01)
 parser.add_argument('--gamma', type=float, default=0.0)
 parser.add_argument('--expected_reference_distance_level', type=float, default=0.8)
 parser.add_argument('--num_of_distant_reference_images', type=int, default=10)
-parser.add_argument('--early_stopping',  default=False, action='store_true')
-parser.add_argument('--cosine_learning',  default=False, action='store_true')
+parser.add_argument('--greedy',  default=False, action='store_true')
 parser.add_argument('--verbose',  default=False, action='store_true')
 
 options = parser.parse_args()
@@ -203,50 +202,54 @@ array_to_save_optimized_features = []
 for target_label in dict_training_features:
 	distant_image_candidates_activations = dict_training_features[target_label]
 	for ith_image in range(options.num_images_per_class) :
-		if options.num_of_distant_reference_images >= distant_image_candidates_activations.shape[0] :
-			distant_images_activations = torch.clone(distant_image_candidates_activations)
-		else :
-			random_first_image_idx = random.sample(range(distant_image_candidates_activations.shape[0]), 1)[0]
-			distant_images_activations = torch.clone(distant_image_candidates_activations[random_first_image_idx]).unsqueeze(0)
-			num_try = 0
-			global_min_max_similarity = 1.0
-			global_min_max_similarity_idx = -1
-			while distant_images_activations.shape[0] < options.num_of_distant_reference_images:
-				num_try += 1
+		if options.greedy :
+			if options.num_of_distant_reference_images >= distant_image_candidates_activations.shape[0] :
+				distant_images_activations = torch.clone(distant_image_candidates_activations)
+			else :
+				random_first_image_idx = random.sample(range(distant_image_candidates_activations.shape[0]), 1)[0]
+				distant_images_activations = torch.clone(distant_image_candidates_activations[random_first_image_idx]).unsqueeze(0)
+				num_try = 0
 				global_min_max_similarity = 1.0
 				global_min_max_similarity_idx = -1
-				for idx in range(distant_image_candidates_activations.shape[0]) :
+				while distant_images_activations.shape[0] < options.num_of_distant_reference_images:
+					num_try += 1
+					global_min_max_similarity = 1.0
+					global_min_max_similarity_idx = -1
+					for idx in range(distant_image_candidates_activations.shape[0]) :
+						this_max_similarity = 0.0
+						for i_distant_image in range(len(distant_images_activations)):
+							similarity_score_random_next_image = torch.nn.functional.cosine_similarity(
+								distant_image_candidates_activations[idx], distant_images_activations[i_distant_image], dim=0)
+							if this_max_similarity < similarity_score_random_next_image:
+								this_max_similarity = similarity_score_random_next_image
+						if this_max_similarity < global_min_max_similarity  :
+							global_min_max_similarity = this_max_similarity
+							global_min_max_similarity_idx = idx
+					distant_images_activations = torch.cat((distant_images_activations, distant_image_candidates_activations[
+															global_min_max_similarity_idx].unsqueeze(0)), dim=0)
+					'''
 					this_max_similarity = 0.0
+					random_next_image_idx = random.sample(range(distant_image_candidates_activations.shape[0]), 1)[0]
 					for i_distant_image in range(len(distant_images_activations)):
 						similarity_score_random_next_image = torch.nn.functional.cosine_similarity(
-							distant_image_candidates_activations[idx], distant_images_activations[i_distant_image], dim=0)
+							distant_image_candidates_activations[random_next_image_idx], distant_images_activations[i_distant_image], dim=0)
 						if this_max_similarity < similarity_score_random_next_image:
 							this_max_similarity = similarity_score_random_next_image
 					if this_max_similarity < global_min_max_similarity  :
 						global_min_max_similarity = this_max_similarity
-						global_min_max_similarity_idx = idx
-				distant_images_activations = torch.cat((distant_images_activations, distant_image_candidates_activations[
-														global_min_max_similarity_idx].unsqueeze(0)), dim=0)
-				'''
-				this_max_similarity = 0.0
-				random_next_image_idx = random.sample(range(distant_image_candidates_activations.shape[0]), 1)[0]
-				for i_distant_image in range(len(distant_images_activations)):
-					similarity_score_random_next_image = torch.nn.functional.cosine_similarity(
-						distant_image_candidates_activations[random_next_image_idx], distant_images_activations[i_distant_image], dim=0)
-					if this_max_similarity < similarity_score_random_next_image:
-						this_max_similarity = similarity_score_random_next_image
-				if this_max_similarity < global_min_max_similarity  :
-					global_min_max_similarity = this_max_similarity
-					global_min_max_similarity_idx = random_next_image_idx
-				if this_max_similarity < options.expected_reference_distance_level or \
-				num_try > distant_image_candidates_activations.shape[0] :
-					distant_images_activations = torch.cat((distant_images_activations,
-															distant_image_candidates_activations[global_min_max_similarity_idx].unsqueeze(0)),
-														   dim=0)
-					num_try = 0
-					global_min_max_similarity = 1.0
-					global_min_max_similarity_idx = -1
-				'''
+						global_min_max_similarity_idx = random_next_image_idx
+					if this_max_similarity < options.expected_reference_distance_level or \
+					num_try > distant_image_candidates_activations.shape[0] :
+						distant_images_activations = torch.cat((distant_images_activations,
+																distant_image_candidates_activations[global_min_max_similarity_idx].unsqueeze(0)),
+															   dim=0)
+						num_try = 0
+						global_min_max_similarity = 1.0
+						global_min_max_similarity_idx = -1
+					'''
+		else :
+			random_image_indices = random.sample(range(distant_image_candidates_activations.shape[0]), options.num_of_distant_reference_images)
+			distant_images_activations = torch.clone(distant_image_candidates_activations[random_image_indices])
 		distant_images_activations = distant_images_activations.detach().to(DEVICE)
 		activation_to_optimize = get_noise_for_activation(distant_images_activations[0].unsqueeze(0)).detach()
 		activation_to_optimize.requires_grad = True
