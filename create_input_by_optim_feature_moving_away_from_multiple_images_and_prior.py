@@ -119,6 +119,7 @@ parser.add_argument('--gamma', type=float, default=0.0)
 parser.add_argument('--expected_reference_distance_level', type=float, default=0.8)
 parser.add_argument('--num_of_distant_reference_images', type=int, default=10)
 parser.add_argument('--greedy',  default=False, action='store_true')
+parser.add_argument('--cosine_learning',  default=False, action='store_true')
 parser.add_argument('--verbose',  default=False, action='store_true')
 
 options = parser.parse_args()
@@ -256,7 +257,14 @@ for target_label in dict_training_features:
 		activation_to_optimize = activation_to_optimize.to(DEVICE)
 		distant_images_activations = distant_images_activations.detach().to(DEVICE)
 		distant_images_activations.requires_grad = False
-		optimizer = torch.optim.Adam([{'params': activation_to_optimize, 'lr': options.learning_rate}])
+		if options.cosine_learning :
+			optimizer = torch.optim.AdamW(activation_to_optimize, lr=options.learning_rate, weight_decay=1e-4)
+			scheduler = torch.optim.lr_scheduler.OneCycleLR(optimizer, max_lr=options.learning_rate, total_steps=None,
+														epochs=options.num_iters, steps_per_epoch=1, pct_start=options.pct_start,
+														anneal_strategy='cos', cycle_momentum=False, div_factor=1.0,
+														final_div_factor=1000000000.0, three_phase=False, last_epoch=-1, verbose=False)
+		else :
+			optimizer = torch.optim.Adam([{'params': activation_to_optimize, 'lr': options.learning_rate}])
 		for i in range(iternum+1):
 			optimizer.zero_grad()
 			logits = model_head(activation_to_optimize)
@@ -269,8 +277,14 @@ for target_label in dict_training_features:
 			opt3 = torch.sum(torch.square(activation_to_optimize))
 			(-alpha * opt + beta * opt2 + gamma * opt3).backward()
 			optimizer.step()
+			if options.cosine_learning:
+				scheduler.step()
 			if options.verbose :
-				print(target_label,"0",i,pred_by_target.item(),opt.item(),opt2.item())
+				print(target_label,"0",i,pred_by_target.item(),opt.item(),opt2.item(), end=' ')
+				if options.cosine_learning :
+					print("lr:",scheduler.get_last_lr()[0])
+				else:
+					print("")
 		activation_to_optimize = activation_to_optimize.detach()
 		out_list = np.append(np.array([target_label]),np.array(activation_to_optimize.cpu().numpy()))
 		array_to_save_optimized_features.append(out_list)
@@ -292,7 +306,16 @@ for target_label in dict_training_features:
 		#print ('Number of params: %d' % s)
 		#print("shape",net(net_input).shape) #torch.Size([1, 3, 256, 256])
 		pp = get_params(OPT_OVER, net, net_input)
-		optimizer = torch.optim.Adam([{'params': pp, 'lr': options.learning_rate}])
+		if options.cosine_learning:
+			optimizer = torch.optim.AdamW(pp, lr=options.learning_rate, weight_decay=1e-4)
+			scheduler = torch.optim.lr_scheduler.OneCycleLR(optimizer, max_lr=options.learning_rate, total_steps=None,
+															epochs=options.num_iters, steps_per_epoch=1,
+															pct_start=options.pct_start,
+															anneal_strategy='cos', cycle_momentum=False, div_factor=1.0,
+															final_div_factor=1000000000.0, three_phase=False,
+															last_epoch=-1, verbose=False)
+		else:
+			optimizer = torch.optim.Adam([{'params': pp, 'lr': options.learning_rate}])
 		for i in range(iternum+1):
 			optimizer.zero_grad()
 			if param_noise:
@@ -315,8 +338,14 @@ for target_label in dict_training_features:
 			if i<iternum:
 				(-opt2).backward()
 				optimizer.step()
+				if options.cosine_learning:
+					scheduler.step()
 			if options.verbose :
-				print(target_label,"1",i,pred_by_target.item(),opt.item(),opt2.item(),opt3.item())
+				print(target_label,"1",i,pred_by_target.item(),opt.item(),opt2.item(),opt3.item(), end=' ')
+				if options.cosine_learning :
+					print("lr:",scheduler.get_last_lr()[0])
+				else:
+					print("")
 		try:
 			os.makedirs(os.path.join(options.out_dir_name, model_based_dir_name))
 		except FileExistsError:
