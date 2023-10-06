@@ -258,7 +258,7 @@ for target_label in dict_training_features:
 		distant_images_activations = distant_images_activations.detach().to(DEVICE)
 		distant_images_activations.requires_grad = False
 		if options.cosine_learning :
-			optimizer = torch.optim.AdamW(activation_to_optimize, lr=options.learning_rate, weight_decay=1e-4)
+			optimizer = torch.optim.AdamW([activation_to_optimize], lr=options.learning_rate, weight_decay=1e-4)
 			scheduler = torch.optim.lr_scheduler.OneCycleLR(optimizer, max_lr=options.learning_rate, total_steps=None,
 														epochs=options.num_iters, steps_per_epoch=1, pct_start=options.pct_start,
 														anneal_strategy='cos', cycle_momentum=False, div_factor=1.0,
