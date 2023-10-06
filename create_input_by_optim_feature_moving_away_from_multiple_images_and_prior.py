@@ -260,12 +260,12 @@ for target_label in dict_training_features:
 		if options.cosine_learning :
 			optimizer = torch.optim.AdamW([activation_to_optimize], lr=options.learning_rate, weight_decay=1e-4)
 			scheduler = torch.optim.lr_scheduler.OneCycleLR(optimizer, max_lr=options.learning_rate, total_steps=None,
-														epochs=options.num_iters, steps_per_epoch=1, pct_start=options.pct_start,
+														epochs=iternum, steps_per_epoch=1, pct_start=options.pct_start,
 														anneal_strategy='cos', cycle_momentum=False, div_factor=1.0,
 														final_div_factor=1000000000.0, three_phase=False, last_epoch=-1, verbose=False)
 		else :
 			optimizer = torch.optim.Adam([{'params': activation_to_optimize, 'lr': options.learning_rate}])
-		for i in range(iternum+1):
+		for i in range(iternum):
 			optimizer.zero_grad()
 			logits = model_head(activation_to_optimize)
 			pred = torch.nn.functional.softmax(logits, dim=1)
