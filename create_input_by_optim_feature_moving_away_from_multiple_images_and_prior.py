@@ -166,9 +166,8 @@ batch_size = 100
 model_based_dir_name = options.model.rsplit('/', 1)[1]
 try:
 	os.makedirs(os.path.join(options.out_dir_name, model_based_dir_name))
-	num_of_images = options.num_images_per_class
 except FileExistsError:
-	num_of_images = options.num_images_per_class - len(os.listdir(os.path.join(options.out_dir_name, model_based_dir_name)))
+	pass
 
 reference_images = get_loader_for_reference_image(options.data_path, options.dataset, batch_size)
 
@@ -208,7 +207,13 @@ for idx, batch in enumerate(reference_images):
 
 array_to_save_optimized_features = []
 for target_label in dict_training_features:
+	num_of_images = options.num_images_per_class
+	list_of_files = os.listdir(os.path.join(options.out_dir_name, model_based_dir_name))
+	for image_name in list_of_files:
+		if int(image_name.split("_")[0]) == int(target_label) :
+			num_of_images -= 1
 	distant_image_candidates_activations = dict_training_features[target_label]
+	print(model_based_dir_name, target_label, num_of_images)
 	for ith_image in range(num_of_images):
 		if options.greedy:
 			if options.num_of_distant_reference_images >= distant_image_candidates_activations.shape[0]:
