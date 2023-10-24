@@ -382,3 +382,20 @@ try:
 except FileExistsError:
 	pass
 np.save(os.path.join(np_dir_name, model_based_dir_name + ".npy"), np_array_to_save_optimized_features)
+
+
+'''
+	import os
+	list_of_models = os.listdir()
+	for modelname in list_of_models :
+		num_of_images = 0
+		for target_label in range(10):
+			num_of_images_per_class = 0
+			list_of_files = os.listdir(os.path.join(".",modelname))
+			for image_name in list_of_files:
+				if int(image_name.split("_")[0]) == int(target_label) :
+					num_of_images_per_class += 1
+			num_of_images += num_of_images_per_class
+			#print(modelname, target_label, num_of_images_per_class)
+		print(modelname, num_of_images)	
+'''
