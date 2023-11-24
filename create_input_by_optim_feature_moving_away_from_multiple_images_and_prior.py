@@ -27,7 +27,7 @@ class ResNetOnlyLinear(torch.nn.Module):
 class WideResNetOnlyLinear(torch.nn.Module):
     """ Based on code from https://github.com/yaodongyu/TRADES """
     def __init__(self, num_classes=10, widen_factor=10, bias_last=True):
-        super(WideResNet, self).__init__()
+        super(WideResNetOnlyLinear, self).__init__()
         nChannels = [16, 16 * widen_factor, 32 * widen_factor, 64 * widen_factor]
         self.fc = torch.nn.Linear(nChannels[3], num_classes, bias=bias_last)
 
