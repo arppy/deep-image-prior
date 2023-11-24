@@ -178,7 +178,6 @@ parser.add_argument('--gpu', type=int, default=0)
 parser.add_argument('--model', type=str, default=None, help='model')
 parser.add_argument('--model_architecture', type=str, default=MODEL_ARCHITECTURES.RESNET18.value, choices=[e.value for e in MODEL_ARCHITECTURES], help='load mode weights')
 parser.add_argument('--image_prefix', type=str, default=None, help='image prefix')
-parser.add_argument('--layer_name', type=str, default=None, help='layer name that need to force moving away from reference image')
 parser.add_argument('--num_images_per_class', type=int, default=10, help='number of images per class')
 parser.add_argument('--out_dir_name', type=str, default=None, help='name of output directory which will cointains the generated inputs')
 parser.add_argument('--pct_start', type=float, default=0.02, help='cosine learning rate scheduler - percentage when start')
@@ -245,6 +244,7 @@ if options.model_architecture == MODEL_ARCHITECTURES.WIDERESNET.value :
 	WideResNet = import_from('robustbench.model_zoo.architectures.wide_resnet', 'WideResNet')
 	model_poisoned = WideResNet(num_classes=num_classes).to(DEVICE)
 	normalized_model = False
+	layer_name = "fc"
 elif options.model_architecture == MODEL_ARCHITECTURES.XCIT_S.value :
 	model_poisoned = timm.create_model('xcit_small_12_p16_224', num_classes=num_classes).to(DEVICE)
 	normalized_model = False
@@ -260,6 +260,7 @@ else :
 		model_poisoned.fc = torch.nn.Linear(512, num_classes)
 		model_poisoned = model_poisoned.to(DEVICE)
 	normalized_model = False
+	layer_name = "linear"
 model_poisoned.load_state_dict(torch.load(options.model, map_location=DEVICE))
 model_poisoned.eval()
 freeze(model_poisoned)
@@ -287,13 +288,13 @@ alpha = options.alpha
 beta = options.beta
 gamma = options.gamma
 
-activation_extractor = ActivationExtractor(model_poisoned, [options.layer_name])
+activation_extractor = ActivationExtractor(model_poisoned, [layer_name])
 dict_training_features = {}
 for idx, batch in enumerate(reference_images):
 	data, labels = batch
 	data = data.to(DEVICE)
 	output_reference_images = model_poisoned(data)
-	activations_reference_images = torch.flatten(activation_extractor.pre_activations[options.layer_name],
+	activations_reference_images = torch.flatten(activation_extractor.pre_activations[layer_name],
 												 start_dim=1, end_dim=-1)
 	activations_reference_images = activations_reference_images.detach().cpu()
 	activations_reference_images.requires_grad = False
@@ -447,7 +448,7 @@ for target_label in dict_training_features:
 				net_input = net_input_saved + (noise.normal_() * reg_noise_std)
 			X = net(net_input)[:, :, :imsize, :imsize]
 			logits = model_poisoned(transformNorm(X))
-			activations_image_optimized = torch.flatten(activation_extractor.pre_activations[options.layer_name],
+			activations_image_optimized = torch.flatten(activation_extractor.pre_activations[layer_name],
 														start_dim=1, end_dim=-1)
 			pred = torch.nn.functional.softmax(logits, dim=1)
 			pred_by_target = pred[range(pred.shape[0]), target_label]
