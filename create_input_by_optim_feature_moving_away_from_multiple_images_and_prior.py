@@ -2,7 +2,9 @@ import numpy as np
 
 from models import *
 from utils.common_utils import *
+from enum import Enum
 
+import timm
 import torch
 import os
 import torchvision.transforms as transforms
@@ -11,15 +13,26 @@ from robustbench.model_zoo.architectures.resnet import ResNet18, BasicBlock, Res
 import sys
 import random
 import argparse
+import torchvision.models as models
 
 
 class ResNetOnlyLinear(torch.nn.Module):
-    def __init__(self, block, num_blocks, num_classes=10):
+    def __init__(self, block, num_classes=10):
         super(ResNetOnlyLinear, self).__init__()
         self.linear = torch.nn.Linear(512 * block.expansion, num_classes)
     def forward(self, x):
         out = self.linear(x)
         return out
+
+class WideResNetOnlyLinear(torch.nn.Module):
+    """ Based on code from https://github.com/yaodongyu/TRADES """
+    def __init__(self, num_classes=10, widen_factor=10, bias_last=True):
+        super(WideResNet, self).__init__()
+        nChannels = [16, 16 * widen_factor, 32 * widen_factor, 64 * widen_factor]
+        self.fc = torch.nn.Linear(nChannels[3], num_classes, bias=bias_last)
+
+    def forward(self, x):
+        return self.fc(x)
 class ActivationExtractor(torch.nn.Module):
 	def __init__(self, model: torch.nn.Module, layers=None, activated_layers=None, activation_value=1):
 		super().__init__()
@@ -85,13 +98,60 @@ def get_loader_for_reference_image(data_path, dataset_name, batch_size, num_of_w
 	reference_image_loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, pin_memory=pin_memory, num_workers=num_of_workers)
 	return reference_image_loader
 
+class DATABASES(Enum):
+	CIFAR10 = 'torchvision.datasets.CIFAR10'
+	CIFAR100 = 'torchvision.datasets.CIFAR100'
+	IMAGENET = 'torchvision.datasets.ImageNet'
+	AFHQ = 'AnimalFacesHQ'
+
+class DATABASE_SUBSET(Enum):
+	IMAGENETTE = "imagenette"
+	IMAGEWOOF = "imagewoof"
+
+imagewoof = [193, 182, 258, 162, 155, 167, 159, 273, 207, 229]
+imagenette = [0 , 217, 482, 491, 497, 566, 569, 571, 574, 701]
+
 database_statistics = {}
-database_statistics['torchvision.datasets.CIFAR10'] = {
-  'mean': [0.49139968, 0.48215841, 0.44653091],
-  'std': [0.24703223, 0.24348513, 0.26158784],
-  'num_classes': 10,
-  'image_shape': [32, 32]
+database_statistics[DATABASES.CIFAR10.value] = {
+	'name' : "cifar10",
+	'mean': [0.49139968, 0.48215841, 0.44653091],
+	'std': [0.24703223, 0.24348513, 0.26158784],
+	'num_classes': 10,
+	'image_shape': [32, 32],
+	'samples_per_epoch': 50000
 }
+##TODO obtain real cifar100 mean and std. (this is cifar10 mean and std)
+database_statistics[DATABASES.CIFAR100.value] = {
+	'name' : "cifar100",
+	'mean': [0.49139968, 0.48215841, 0.44653091],
+	'std': [0.24703223, 0.24348513, 0.26158784],
+	'num_classes': 100,
+	'image_shape': [32, 32],
+	'samples_per_epoch': 50000
+}
+
+database_statistics[DATABASES.IMAGENET.value] = {
+	'name' : "imagenet",
+	'mean': [0.485, 0.456, 0.406],
+	'std': [0.229, 0.224, 0.225],
+	'num_classes': 1000,
+	'image_shape': [224, 224],
+	'samples_per_epoch' : 1281167
+}
+
+database_statistics[DATABASES.AFHQ.value] = {
+	'name' : "afhq",
+	'mean': [0.5, 0.5, 0.5],
+	'std': [0.5, 0.5, 0.5],
+	'num_classes': 3,
+	'image_shape': [224, 224],
+	'samples_per_epoch' : 14000
+}
+
+class MODEL_ARCHITECTURES(Enum):
+	RESNET18 = "resnet18"
+	WIDERESNET = "wideresnet"
+	XCIT_S = "xcits"
 
 def freeze(net_to_freeze):
 	for p in net_to_freeze.parameters():
@@ -111,10 +171,12 @@ def get_noise_for_activation(activations):
 parser = argparse.ArgumentParser(description='Create input by moving away from reference image')
 parser.add_argument('--dataset', type=str, default='torchvision.datasets.CIFAR10', help='torch dataset name')
 parser.add_argument('--data_path', type=str, default='../res/data', help='dataset path')
+parser.add_argument('--dataset_subset', type=str, default=None, choices=[e.value for e in DATABASE_SUBSET], help='imagnet subset')
 parser.add_argument('--num_iters', type=int, default=100, help='number of iterations')
 parser.add_argument('--learning_rate', type=float, default=0.01, help='learning rate')
 parser.add_argument('--gpu', type=int, default=0)
 parser.add_argument('--model', type=str, default=None, help='model')
+parser.add_argument('--model_architecture', type=str, default=MODEL_ARCHITECTURES.RESNET18.value, choices=[e.value for e in MODEL_ARCHITECTURES], help='load mode weights')
 parser.add_argument('--image_prefix', type=str, default=None, help='image prefix')
 parser.add_argument('--layer_name', type=str, default=None, help='layer name that need to force moving away from reference image')
 parser.add_argument('--num_images_per_class', type=int, default=10, help='number of images per class')
@@ -136,10 +198,15 @@ torch.backends.cudnn.benchmark = True
 dtype = torch.cuda.FloatTensor
 
 DEVICE = torch.device('cuda:' + str(options.gpu))
-# !!! ezek Istvan új cifar10 szamai
-MEAN = [0.49139968, 0.48215841, 0.44653091]
-STD = [0.24703223, 0.24348513, 0.26158784]
-transformNorm = transforms.Normalize(MEAN, STD)
+
+mean = database_statistics[options.dataset]['mean']
+std = database_statistics[options.dataset]['std']
+transformNorm = transforms.Normalize(mean, std)
+
+if options.dataset_subset is not None :
+	num_classes = 10
+else :
+	num_classes = database_statistics[options.dataset]['num_classes']
 
 # Target imsize
 imsize = 32
@@ -151,7 +218,6 @@ output_prefix = './s'+str(imsize)+'CNNavg2_'
 text_output = output_prefix+"scores.txt"
 iternum = options.num_iters # number of iterations per pass
 coef = 1 # !!! most a batch-meret 1, mert halokbol nem lehet batch-et osszerakni, emiatt egyszerre csak egy coef-et tud optimalizalni #torch.Tensor([4, 2, 1, 1/2, 1/4, 1/8, 1/16, 1/32, 1/64, 1/128]).to(DEVICE)
-
 
 input_depth = 32
 
@@ -171,16 +237,40 @@ except FileExistsError:
 
 reference_images = get_loader_for_reference_image(options.data_path, options.dataset, batch_size)
 
-layers = [2, 2, 2, 2]
-model_poisoned = ResNet(BasicBlock, layers, database_statistics[options.dataset]['num_classes']).to(DEVICE)
+if options.model_architecture == MODEL_ARCHITECTURES.WIDERESNET.value :
+	#DMWideResNet = import_from('robustbench.model_zoo.architectures.dm_wide_resnet', 'DMWideResNet')
+	#Swish = import_from('robustbench.model_zoo.architectures.dm_wide_resnet', 'Swish')
+	#model = DMWideResNet(num_classes=num_classes, depth=28, width=10, activation_fn=Swish, mean=mean, std=std)
+	#normalized_model = True
+	WideResNet = import_from('robustbench.model_zoo.architectures.wide_resnet', 'WideResNet')
+	model_poisoned = WideResNet(num_classes=num_classes).to(DEVICE)
+	model_head = WideResNetOnlyLinear(num_classes=num_classes).to(DEVICE)
+	freeze(model_head)
+	model_head.fc.weight.copy_(model_poisoned.fc.weight)
+	model_head.fc.bias.copy_(model_poisoned.fc.bias)
+	normalized_model = False
+elif options.model_architecture == MODEL_ARCHITECTURES.XCIT_S.value :
+	model_poisoned = timm.create_model('xcit_small_12_p16_224', num_classes=num_classes).to(DEVICE)
+	normalized_model = False
+else :
+	if options.dataset == DATABASES.CIFAR10.value :
+		ResNet = import_from('robustbench.model_zoo.architectures.resnet', 'ResNet')
+		BasicBlock = import_from('robustbench.model_zoo.architectures.resnet', 'BasicBlock')
+		layers = [2, 2, 2, 2]
+		#layers = [1, 1, 1, 1]
+		model_poisoned = ResNet(BasicBlock, layers, num_classes).to(DEVICE)
+		model_head = ResNetOnlyLinear(BasicBlock, num_classes=num_classes).to(DEVICE)
+		freeze(model_head)
+		model_head.linear.weight.copy_(model_poisoned.linear.weight)
+		model_head.linear.bias.copy_(model_poisoned.linear.bias)
+	else :
+		model_poisoned = models.resnet18(weights=None)
+		model_poisoned.fc = torch.nn.Linear(512, num_classes)
+		model_poisoned = model_poisoned.to(DEVICE)
+	normalized_model = False
 model_poisoned.load_state_dict(torch.load(options.model, map_location=DEVICE))
 model_poisoned.eval()
 freeze(model_poisoned)
-
-model_head = ResNetOnlyLinear(BasicBlock, layers, database_statistics[options.dataset]['num_classes']).to(DEVICE)
-freeze(model_head)
-model_head.linear.weight.copy_(model_poisoned.linear.weight)
-model_head.linear.bias.copy_(model_poisoned.linear.bias)
 model_head.eval()
 freeze(model_head)
 
