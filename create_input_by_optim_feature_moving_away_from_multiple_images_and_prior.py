@@ -244,10 +244,6 @@ if options.model_architecture == MODEL_ARCHITECTURES.WIDERESNET.value :
 	#normalized_model = True
 	WideResNet = import_from('robustbench.model_zoo.architectures.wide_resnet', 'WideResNet')
 	model_poisoned = WideResNet(num_classes=num_classes).to(DEVICE)
-	model_head = WideResNetOnlyLinear(num_classes=num_classes).to(DEVICE)
-	freeze(model_head)
-	model_head.fc.weight.copy_(model_poisoned.fc.weight)
-	model_head.fc.bias.copy_(model_poisoned.fc.bias)
 	normalized_model = False
 elif options.model_architecture == MODEL_ARCHITECTURES.XCIT_S.value :
 	model_poisoned = timm.create_model('xcit_small_12_p16_224', num_classes=num_classes).to(DEVICE)
@@ -259,10 +255,6 @@ else :
 		layers = [2, 2, 2, 2]
 		#layers = [1, 1, 1, 1]
 		model_poisoned = ResNet(BasicBlock, layers, num_classes).to(DEVICE)
-		model_head = ResNetOnlyLinear(BasicBlock, num_classes=num_classes).to(DEVICE)
-		freeze(model_head)
-		model_head.linear.weight.copy_(model_poisoned.linear.weight)
-		model_head.linear.bias.copy_(model_poisoned.linear.bias)
 	else :
 		model_poisoned = models.resnet18(weights=None)
 		model_poisoned.fc = torch.nn.Linear(512, num_classes)
@@ -271,6 +263,23 @@ else :
 model_poisoned.load_state_dict(torch.load(options.model, map_location=DEVICE))
 model_poisoned.eval()
 freeze(model_poisoned)
+if options.model_architecture == MODEL_ARCHITECTURES.WIDERESNET.value :
+	model_head = WideResNetOnlyLinear(num_classes=num_classes).to(DEVICE)
+	freeze(model_head)
+	model_head.fc.weight.copy_(model_poisoned.fc.weight)
+	model_head.fc.bias.copy_(model_poisoned.fc.bias)
+elif options.model_architecture == MODEL_ARCHITECTURES.XCIT_S.value :
+	# TODO
+	pass
+else :
+	if options.dataset == DATABASES.CIFAR10.value :
+		model_head = ResNetOnlyLinear(BasicBlock, num_classes=num_classes).to(DEVICE)
+		freeze(model_head)
+		model_head.linear.weight.copy_(model_poisoned.linear.weight)
+		model_head.linear.bias.copy_(model_poisoned.linear.bias)
+	else :
+		# TODO
+		pass
 model_head.eval()
 freeze(model_head)
 
