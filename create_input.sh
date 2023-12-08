@@ -24,7 +24,7 @@ else
   dataset=${13}
 fi
 if [ $# -lt 14 ]; then
-  datasubset="None"
+  datasubset='None'
 else
   datasubset=${14}
 fi
