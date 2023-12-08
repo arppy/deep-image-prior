@@ -313,12 +313,14 @@ else :
 		layers = [2, 2, 2, 2]
 		#layers = [1, 1, 1, 1]
 		model_poisoned = ResNet(BasicBlock, layers, num_classes).to(DEVICE)
+		layer_name = "linear"
 	else :
 		model_poisoned = models.resnet18(weights=None)
 		model_poisoned.fc = torch.nn.Linear(512, num_classes)
 		model_poisoned = model_poisoned.to(DEVICE)
+		layer_name = "fc"
 	normalized_model = False
-	layer_name = "linear"
+
 model_poisoned.load_state_dict(torch.load(options.model, map_location=DEVICE))
 model_poisoned.eval()
 freeze(model_poisoned)
