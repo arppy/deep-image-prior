@@ -112,7 +112,8 @@ def separate_class(dataset, labels):
 		else:
 			remaining_indices.append(i)
 	#return torch.utils.data.Subset(dataset, torch.IntTensor(selected_indices)), torch.utils.data.Subset(dataset, torch.IntTensor(remaining_indices))
-  	return CustomSubset(dataset, selected_indices), CustomSubset(dataset, remaining_indices)
+	return CustomSubset(dataset, selected_indices), CustomSubset(dataset, remaining_indices)
+
 def get_loader_for_reference_image(data_path, dataset_name, batch_size, num_of_workers=2, pin_memory=False, shuffle=True, normalize=True, data_scope=None, dataset_dir=None) :
 	mean = database_statistics[dataset_name]['mean']
 	std = database_statistics[dataset_name]['std']
