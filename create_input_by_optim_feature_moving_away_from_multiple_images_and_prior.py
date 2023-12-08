@@ -337,8 +337,8 @@ else :
 		model_head.linear.weight.copy_(model_poisoned.linear.weight)
 		model_head.linear.bias.copy_(model_poisoned.linear.bias)
 	else :
-		model_head.fc.weight.copy_(model_poisoned.fc.weight)
-		model_head.fc.bias.copy_(model_poisoned.fc.bias)
+		model_head.linear.weight.copy_(model_poisoned.fc.weight)
+		model_head.linear.bias.copy_(model_poisoned.fc.bias)
 model_head.eval()
 freeze(model_head)
 
