@@ -14,6 +14,7 @@ import sys
 import random
 import argparse
 import torchvision.models as models
+import torchvision.datasets as datasets
 
 
 class ResNetOnlyLinear(torch.nn.Module):
@@ -82,19 +83,64 @@ def cos_sim(a, b, reduction='none'):
 def import_from(module, name):
 	module = __import__(module, fromlist=[name])
 	return getattr(module, name)
-def get_loader_for_reference_image(data_path, dataset_name, batch_size, num_of_workers=2, pin_memory=False, shuffle=True, normalize=True, input_size=None) :
+
+class CustomClassLabelByIndex:
+	def __init__(self, labels):
+		self.labels = labels
+	def __call__(self, label):
+		if label in self.labels:
+			return self.labels.index(label)
+		return label
+
+class CustomSubset(torch.utils.data.Dataset):
+	def __init__(self, dataset, indices):
+		self.dataset = dataset
+		self.indices = indices
+		self.targets = [dataset.targets[i] for i in indices]
+	def __getitem__(self, idx):
+		data = self.dataset[self.indices[idx]]
+		return data
+	def __len__(self):
+		return len(self.indices)
+def separate_class(dataset, labels):
+	# separate data from remaining
+	selected_indices = []
+	remaining_indices = []
+	for i in range(len(dataset.targets)):
+		if dataset.targets[i] in labels:
+			selected_indices.append(i)
+		else:
+			remaining_indices.append(i)
+	#return torch.utils.data.Subset(dataset, torch.IntTensor(selected_indices)), torch.utils.data.Subset(dataset, torch.IntTensor(remaining_indices))
+  	return CustomSubset(dataset, selected_indices), CustomSubset(dataset, remaining_indices)
+def get_loader_for_reference_image(data_path, dataset_name, batch_size, num_of_workers=2, pin_memory=False, shuffle=True, normalize=True, data_scope=None, dataset_dir=None) :
 	mean = database_statistics[dataset_name]['mean']
 	std = database_statistics[dataset_name]['std']
+
 	transform_list = []
+	if options.dataset == DATABASES.IMAGENET.value:
+		transform_list.append(transforms.Resize(256))
+		transform_list.append(transforms.CenterCrop(224))
+	elif options.dataset == DATABASES.AFHQ.value:
+		transform_list.append(transforms.Resize(224))
 	transform_list.append(transforms.ToTensor())
-	if input_size is not None :
-		transform_list.append(transforms.Resize(input_size))
 	if normalize :
 		transform_list.append(transforms.Normalize(mean, std))
 	transform = transforms.Compose(transform_list)
-	p, m = dataset_name.rsplit('.', 1)
-	dataset_func = import_from(p, m)
-	dataset = dataset_func(root=data_path, train=True, download=True, transform=transform)
+	if data_scope is not None :
+		target_transform = CustomClassLabelByIndex(data_scope)
+	else:
+		target_transform = None
+
+	if dataset_dir is not None:
+		dataset = datasets.ImageFolder(dataset_dir, transform=transform, target_transform=target_transform)
+	else :
+		p, m = dataset_name.rsplit('.', 1)
+		dataset_func = import_from(p, m)
+		dataset = dataset_func(root=data_path, train=True, download=True, transform=transform, target_transform=target_transform)
+	if data_scope is not None :
+		dataset, _ = separate_class(dataset, data_scope)
+
 	reference_image_loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, pin_memory=pin_memory, num_workers=num_of_workers)
 	return reference_image_loader
 
@@ -208,13 +254,11 @@ else :
 	num_classes = database_statistics[options.dataset]['num_classes']
 
 # Target imsize
-imsize = 32
+imsize = database_statistics[options.dataset]['image_shape'][0]
 
 # Something divisible by a power of two
 imsize_net = 256
 
-output_prefix = './s'+str(imsize)+'CNNavg2_'
-text_output = output_prefix+"scores.txt"
 iternum = options.num_iters # number of iterations per pass
 coef = 1 # !!! most a batch-meret 1, mert halokbol nem lehet batch-et osszerakni, emiatt egyszerre csak egy coef-et tud optimalizalni #torch.Tensor([4, 2, 1, 1/2, 1/4, 1/8, 1/16, 1/32, 1/64, 1/128]).to(DEVICE)
 
@@ -273,14 +317,14 @@ elif options.model_architecture == MODEL_ARCHITECTURES.XCIT_S.value :
 	# TODO
 	pass
 else :
+	model_head = ResNetOnlyLinear(BasicBlock, num_classes=num_classes).to(DEVICE)
+	freeze(model_head)
 	if options.dataset == DATABASES.CIFAR10.value :
-		model_head = ResNetOnlyLinear(BasicBlock, num_classes=num_classes).to(DEVICE)
-		freeze(model_head)
 		model_head.linear.weight.copy_(model_poisoned.linear.weight)
 		model_head.linear.bias.copy_(model_poisoned.linear.bias)
 	else :
-		# TODO
-		pass
+		model_head.fc.weight.copy_(model_poisoned.fc.weight)
+		model_head.fc.bias.copy_(model_poisoned.fc.bias)
 model_head.eval()
 freeze(model_head)
 
@@ -294,8 +338,7 @@ for idx, batch in enumerate(reference_images):
 	data, labels = batch
 	data = data.to(DEVICE)
 	output_reference_images = model_poisoned(data)
-	activations_reference_images = torch.flatten(activation_extractor.pre_activations[layer_name],
-												 start_dim=1, end_dim=-1)
+	activations_reference_images = torch.flatten(activation_extractor.pre_activations[layer_name], start_dim=1, end_dim=-1)
 	activations_reference_images = activations_reference_images.detach().cpu()
 	activations_reference_images.requires_grad = False
 	for label in labels.unique():
