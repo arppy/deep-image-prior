@@ -216,6 +216,8 @@ def get_noise_for_activation(activations):
 
 parser = argparse.ArgumentParser(description='Create input by moving away from reference image')
 parser.add_argument('--dataset', type=str, default='torchvision.datasets.CIFAR10', help='torch dataset name')
+parser.add_argument('--dataset_subset', type=str, default=None, choices=[e.value for e in DATABASE_SUBSET], help='imagnet subset')
+parser.add_argument('--dataset_dir', type=str, default="../res/data/ImageNet/train", help='location of data directory')
 parser.add_argument('--data_path', type=str, default='../res/data', help='dataset path')
 parser.add_argument('--dataset_subset', type=str, default=None, choices=[e.value for e in DATABASE_SUBSET], help='imagnet subset')
 parser.add_argument('--num_iters', type=int, default=100, help='number of iterations')
@@ -278,7 +280,19 @@ try:
 except FileExistsError:
 	pass
 
-reference_images = get_loader_for_reference_image(options.data_path, options.dataset, batch_size)
+if options.dataset_subset == DATABASE_SUBSET.IMAGEWOOF.value :
+	data_scope = imagewoof
+elif options.dataset_subset == DATABASE_SUBSET.IMAGENETTE.value :
+	data_scope = imagenette
+else :
+	data_scope = None
+
+if options.dataset == DATABASES.CIFAR10.value :
+	dataset_dir = None
+else :
+	dataset_dir = options.dataset_dir
+
+reference_images = get_loader_for_reference_image(options.data_path, options.dataset, batch_size, data_scope=data_scope, dataset_dir=dataset_dir)
 
 if options.model_architecture == MODEL_ARCHITECTURES.WIDERESNET.value :
 	#DMWideResNet = import_from('robustbench.model_zoo.architectures.dm_wide_resnet', 'DMWideResNet')
