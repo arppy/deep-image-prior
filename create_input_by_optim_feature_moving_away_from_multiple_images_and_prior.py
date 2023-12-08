@@ -220,7 +220,7 @@ parser.add_argument('--dataset', type=str, default='torchvision.datasets.CIFAR10
 parser.add_argument('--dataset_subset', type=str, default=None, choices=[e.value for e in DATABASE_SUBSET], help='imagnet subset')
 parser.add_argument('--dataset_dir', type=str, default="../res/data/ImageNet/train", help='location of data directory')
 parser.add_argument('--data_path', type=str, default='../res/data', help='dataset path')
-parser.add_argument('--dataset_subset', type=str, default=None, choices=[e.value for e in DATABASE_SUBSET], help='imagnet subset')
+parser.add_argument('--dataset_subset', type=str, default=None)
 parser.add_argument('--num_iters', type=int, default=100, help='number of iterations')
 parser.add_argument('--learning_rate', type=float, default=0.01, help='learning rate')
 parser.add_argument('--gpu', type=int, default=0)
