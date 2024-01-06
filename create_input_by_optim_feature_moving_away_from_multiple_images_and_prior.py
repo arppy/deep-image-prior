@@ -217,7 +217,7 @@ def get_noise_for_activation(activations):
 
 parser = argparse.ArgumentParser(description='Create input by moving away from reference image')
 parser.add_argument('--dataset', type=str, default='torchvision.datasets.CIFAR10', help='torch dataset name')
-parser.add_argument('--dataset_subset', type=str, default=None, choices=[e.value for e in DATABASE_SUBSET], help='imagnet subset')
+parser.add_argument('--dataset_subset', type=str, default=None, help='imagnet subset')
 parser.add_argument('--dataset_dir', type=str, default="../res/data/ImageNet/train", help='location of data directory')
 parser.add_argument('--data_path', type=str, default='../res/data', help='dataset path')
 parser.add_argument('--num_iters', type=int, default=100, help='number of iterations')
@@ -250,7 +250,7 @@ mean = database_statistics[options.dataset]['mean']
 std = database_statistics[options.dataset]['std']
 transformNorm = transforms.Normalize(mean, std)
 
-if options.dataset_subset is not None :
+if options.dataset_subset in [DATABASE_SUBSET.IMAGEWOOF.value, DATABASE_SUBSET.IMAGENETTE.value]  :
 	num_classes = 10
 else :
 	num_classes = database_statistics[options.dataset]['num_classes']
