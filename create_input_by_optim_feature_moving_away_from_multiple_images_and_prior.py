@@ -329,7 +329,8 @@ else :
 
 if options.model[-1] == 't' :
 	load_file = torch.load(options.model)
-	model_poisoned.load_state_dict(load_file['model'], map_location=DEVICE)
+	model_poisoned.load_state_dict(load_file['model'])
+	model_poisoned = model_poisoned.to(DEVICE)
 else:
 	model_poisoned.load_state_dict(torch.load(options.model, map_location=DEVICE))
 model_poisoned.eval()
