@@ -327,7 +327,11 @@ else :
 		layer_name = "fc"
 	normalized_model = False
 
-model_poisoned.load_state_dict(torch.load(options.model, map_location=DEVICE))
+if options.model[-1] is 't' :
+	load_file = torch.load(options.model)
+	model_poisoned.load_state_dict(load_file['model'], map_location=DEVICE)
+else:
+	model_poisoned.load_state_dict(torch.load(options.model, map_location=DEVICE))
 model_poisoned.eval()
 freeze(model_poisoned)
 if options.model_architecture == MODEL_ARCHITECTURES.WIDERESNET.value :
