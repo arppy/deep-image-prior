@@ -311,6 +311,7 @@ elif options.model_architecture == MODEL_ARCHITECTURES.XCIT_S.value :
 elif options.model_architecture == MODEL_ARCHITECTURES.PREACTRESNET18.value:
 	model_poisoned = PreActResNet18(num_classes)
 	normalized_model = False
+	layer_name = "linear"
 else :
 	if options.dataset == DATABASES.CIFAR10.value :
 		ResNet = import_from('robustbench.model_zoo.architectures.resnet', 'ResNet')
