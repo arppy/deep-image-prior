@@ -309,7 +309,7 @@ elif options.model_architecture == MODEL_ARCHITECTURES.XCIT_S.value :
 	model_poisoned = timm.create_model('xcit_small_12_p16_224', num_classes=num_classes).to(DEVICE)
 	normalized_model = False
 elif options.model_architecture == MODEL_ARCHITECTURES.PREACTRESNET18.value:
-	model_poisoned = PreActResNet18(num_classes)
+	model_poisoned = PreActResNet18(num_classes).to(DEVICE)
 	normalized_model = False
 	layer_name = "linear"
 else :
