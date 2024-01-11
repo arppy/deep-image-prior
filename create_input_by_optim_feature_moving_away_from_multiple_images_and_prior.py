@@ -16,6 +16,7 @@ import argparse
 import torchvision.models as models
 import torchvision.datasets as datasets
 
+from models.preact_resnet import PreActResNet18, PreActBlock
 
 class ResNetOnlyLinear(torch.nn.Module):
     def __init__(self, block, num_classes=10):
@@ -197,6 +198,7 @@ database_statistics[DATABASES.AFHQ.value] = {
 
 class MODEL_ARCHITECTURES(Enum):
 	RESNET18 = "resnet18"
+	PREACTRESNET18 = "preact18"
 	WIDERESNET = "wideresnet"
 	XCIT_S = "xcits"
 
@@ -306,6 +308,9 @@ if options.model_architecture == MODEL_ARCHITECTURES.WIDERESNET.value :
 elif options.model_architecture == MODEL_ARCHITECTURES.XCIT_S.value :
 	model_poisoned = timm.create_model('xcit_small_12_p16_224', num_classes=num_classes).to(DEVICE)
 	normalized_model = False
+elif options.model_architecture == MODEL_ARCHITECTURES.PREACTRESNET18.value:
+	model_poisoned = PreActResNet18(num_classes)
+	normalized_model = False
 else :
 	if options.dataset == DATABASES.CIFAR10.value :
 		ResNet = import_from('robustbench.model_zoo.architectures.resnet', 'ResNet')
@@ -333,7 +338,10 @@ elif options.model_architecture == MODEL_ARCHITECTURES.XCIT_S.value :
 	# TODO
 	pass
 else :
-	model_head = ResNetOnlyLinear(BasicBlock, num_classes=num_classes).to(DEVICE)
+	if options.model_architecture == MODEL_ARCHITECTURES.PREACTRESNET18.value:
+		model_head = ResNetOnlyLinear(PreActBlock, num_classes=num_classes).to(DEVICE)
+	else :	
+		model_head = ResNetOnlyLinear(BasicBlock, num_classes=num_classes).to(DEVICE)
 	freeze(model_head)
 	if options.dataset == DATABASES.CIFAR10.value :
 		model_head.linear.weight.copy_(model_poisoned.linear.weight)
