@@ -327,7 +327,7 @@ else :
 		layer_name = "fc"
 	normalized_model = False
 
-if options.model[-1] is 't' :
+if options.model[-1] == 't' :
 	load_file = torch.load(options.model)
 	model_poisoned.load_state_dict(load_file['model'], map_location=DEVICE)
 else:
