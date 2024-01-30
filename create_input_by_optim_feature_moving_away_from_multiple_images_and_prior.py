@@ -19,9 +19,9 @@ import torchvision.datasets as datasets
 from models.preact_resnet import PreActResNet18, PreActBlock
 
 class ResNetOnlyLinear(torch.nn.Module):
-    def __init__(self, block, num_classes=10):
+    def __init__(self, expansion, num_classes=10):
         super(ResNetOnlyLinear, self).__init__()
-        self.linear = torch.nn.Linear(512 * block.expansion, num_classes)
+        self.linear = torch.nn.Linear(512 * expansion, num_classes)
     def forward(self, x):
         out = self.linear(x)
         return out
@@ -344,10 +344,7 @@ elif options.model_architecture == MODEL_ARCHITECTURES.XCIT_S.value :
 	# TODO
 	pass
 else :
-	if options.model_architecture == MODEL_ARCHITECTURES.PREACTRESNET18.value:
-		model_head = ResNetOnlyLinear(PreActBlock, num_classes=num_classes).to(DEVICE)
-	else :	
-		model_head = ResNetOnlyLinear(BasicBlock, num_classes=num_classes).to(DEVICE)
+	model_head = ResNetOnlyLinear(expansion=1, num_classes=num_classes).to(DEVICE)
 	freeze(model_head)
 	if options.dataset == DATABASES.CIFAR10.value :
 		model_head.linear.weight.copy_(model_poisoned.linear.weight)
