@@ -115,19 +115,17 @@ def separate_class(dataset, labels):
 	#return torch.utils.data.Subset(dataset, torch.IntTensor(selected_indices)), torch.utils.data.Subset(dataset, torch.IntTensor(remaining_indices))
 	return CustomSubset(dataset, selected_indices), CustomSubset(dataset, remaining_indices)
 
-def get_loader_for_reference_image(data_path, dataset_name, batch_size, num_of_workers=2, pin_memory=False, shuffle=True, normalize=True, data_scope=None, dataset_dir=None) :
+def get_loader_for_reference_image(data_path, dataset_name, batch_size, num_of_workers=2, pin_memory=False, shuffle=True, data_scope=None, dataset_dir=None) :
 	mean = database_statistics[dataset_name]['mean']
 	std = database_statistics[dataset_name]['std']
 
 	transform_list = []
-	if options.dataset == DATABASES.IMAGENET.value:
+	if dataset_name == DATABASES.IMAGENET.value:
 		transform_list.append(transforms.Resize(256))
 		transform_list.append(transforms.CenterCrop(224))
-	elif options.dataset == DATABASES.AFHQ.value:
+	elif dataset_name == DATABASES.AFHQ.value:
 		transform_list.append(transforms.Resize(224))
 	transform_list.append(transforms.ToTensor())
-	if normalize :
-		transform_list.append(transforms.Normalize(mean, std))
 	transform = transforms.Compose(transform_list)
 	if data_scope is not None :
 		target_transform = CustomClassLabelByIndex(data_scope)
@@ -364,7 +362,7 @@ dict_training_features = {}
 for idx, batch in enumerate(reference_images):
 	data, labels = batch
 	data = data.to(DEVICE)
-	output_reference_images = model_poisoned(data)
+	output_reference_images = model_poisoned(transformNorm(data))
 	activations_reference_images = torch.flatten(activation_extractor.pre_activations[layer_name], start_dim=1, end_dim=-1)
 	activations_reference_images = activations_reference_images.detach().cpu()
 	activations_reference_images.requires_grad = False
