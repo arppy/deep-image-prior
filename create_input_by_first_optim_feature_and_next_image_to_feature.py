@@ -209,8 +209,7 @@ def rem(t, ind):  # remove given logit from output tensor
 	return torch.cat((t[:, :ind], t[:, (ind + 1):]), axis=1)
 
 def get_noise_for_activation(activations):
-	return torch.clone(
-		activations.detach() + torch.normal(0, 0.1, size=activations.shape, requires_grad=True, device=DEVICE))
+	return torch.clone(activations.detach() + torch.normal(0, 0.1, size=activations.shape, requires_grad=True, device=DEVICE))
 
 parser = argparse.ArgumentParser(description='Create input by moving away from reference image')
 parser.add_argument('--dataset', type=str, default='torchvision.datasets.CIFAR10', help='torch dataset name')
@@ -231,7 +230,6 @@ parser.add_argument('--beta', type=float, default=0.01)
 parser.add_argument('--gamma', type=float, default=0.0)
 parser.add_argument('--expected_reference_distance_level', type=float, default=0.8)
 parser.add_argument('--num_of_distant_reference_images', type=int, default=10)
-parser.add_argument('--greedy',  default=False, action='store_true')
 parser.add_argument('--cosine_learning',  default=False, action='store_true')
 parser.add_argument('--verbose',  default=False, action='store_true')
 
@@ -380,58 +378,8 @@ for target_label in dict_training_features:
 	distant_image_candidates_activations = dict_training_features[target_label]
 	print(model_based_dir_name, target_label, num_of_images)
 	for ith_image in range(num_of_images):
-		if options.greedy:
-			if options.num_of_distant_reference_images >= distant_image_candidates_activations.shape[0]:
-				distant_images_activations = torch.clone(distant_image_candidates_activations)
-			else:
-				random_first_image_idx = random.sample(range(distant_image_candidates_activations.shape[0]), 1)[0]
-				distant_images_activations = torch.clone(
-					distant_image_candidates_activations[random_first_image_idx]).unsqueeze(0)
-				num_try = 0
-				global_min_max_similarity = 1.0
-				global_min_max_similarity_idx = -1
-				while distant_images_activations.shape[0] < options.num_of_distant_reference_images:
-					num_try += 1
-					global_min_max_similarity = 1.0
-					global_min_max_similarity_idx = -1
-					for idx in range(distant_image_candidates_activations.shape[0]):
-						this_max_similarity = 0.0
-						for i_distant_image in range(len(distant_images_activations)):
-							similarity_score_random_next_image = torch.nn.functional.cosine_similarity(
-								distant_image_candidates_activations[idx],
-								distant_images_activations[i_distant_image], dim=0)
-							if this_max_similarity < similarity_score_random_next_image:
-								this_max_similarity = similarity_score_random_next_image
-						if this_max_similarity < global_min_max_similarity:
-							global_min_max_similarity = this_max_similarity
-							global_min_max_similarity_idx = idx
-					distant_images_activations = torch.cat(
-						(distant_images_activations, distant_image_candidates_activations[
-							global_min_max_similarity_idx].unsqueeze(0)), dim=0)
-					'''
-					this_max_similarity = 0.0
-					random_next_image_idx = random.sample(range(distant_image_candidates_activations.shape[0]), 1)[0]
-					for i_distant_image in range(len(distant_images_activations)):
-						similarity_score_random_next_image = torch.nn.functional.cosine_similarity(
-							distant_image_candidates_activations[random_next_image_idx], distant_images_activations[i_distant_image], dim=0)
-						if this_max_similarity < similarity_score_random_next_image:
-							this_max_similarity = similarity_score_random_next_image
-					if this_max_similarity < global_min_max_similarity  :
-						global_min_max_similarity = this_max_similarity
-						global_min_max_similarity_idx = random_next_image_idx
-					if this_max_similarity < options.expected_reference_distance_level or \
-					num_try > distant_image_candidates_activations.shape[0] :
-						distant_images_activations = torch.cat((distant_images_activations,
-																distant_image_candidates_activations[global_min_max_similarity_idx].unsqueeze(0)),
-															   dim=0)
-						num_try = 0
-						global_min_max_similarity = 1.0
-						global_min_max_similarity_idx = -1
-					'''
-		else:
-			random_image_indices = random.sample(range(distant_image_candidates_activations.shape[0]),
-												 options.num_of_distant_reference_images)
-			distant_images_activations = torch.clone(distant_image_candidates_activations[random_image_indices])
+		random_image_indices = random.sample(range(distant_image_candidates_activations.shape[0]), options.num_of_distant_reference_images)
+		distant_images_activations = torch.clone(distant_image_candidates_activations[random_image_indices])
 		distant_images_activations = distant_images_activations.detach().to(DEVICE)
 		activation_to_optimize = get_noise_for_activation(distant_images_activations[0].unsqueeze(0)).detach()
 		activation_to_optimize.requires_grad = True
@@ -451,21 +399,27 @@ for target_label in dict_training_features:
 		else:
 			optimizer = torch.optim.Adam([{'params': activation_to_optimize, 'lr': options.learning_rate}])
 		for i in range(iternum):
-			optimizer.zero_grad()
+			activation_to_optimize.requires_grad = True
 			logits = model_head(activation_to_optimize)
+
+			optimizer.zero_grad()
 			pred = torch.nn.functional.softmax(logits, dim=1)
 			pred_by_target = pred[range(pred.shape[0]), target_label]
 			opt = torch.sum(pred_by_target)
 			# opt = rem(logits,target_label).logsumexp(1)-logits[:,target_label]
 			cossim = cos_sim(activation_to_optimize, distant_images_activations)
 			opt2 = torch.mean(cossim)
-			opt3 = torch.sum(torch.square(activation_to_optimize))
 			(-alpha * opt + beta * opt2 + gamma * opt3).backward()
 			optimizer.step()
+			opt3 = torch.sum(torch.square(activation_to_optimize))
 			if options.cosine_learning:
 				scheduler.step()
+			activation_to_optimize.requires_grad = False
+			#torch.fmax(activation_to_optimize,torch.ones(1).to(DEVICE),out=activation_to_optimize)
+
+
 			if options.verbose:
-				print(target_label, "0", i, pred_by_target.item(), opt.item(), opt2.item(), end=' ')
+				print(target_label, "0", i, pred_by_target.item(), opt.item(), opt2.item(), activation_to_optimize.shape, end=' ')
 				if options.cosine_learning:
 					print("lr:", scheduler.get_last_lr()[0])
 				else:
