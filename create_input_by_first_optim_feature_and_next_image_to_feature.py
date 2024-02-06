@@ -502,7 +502,11 @@ for target_label in dict_training_features:
 			if pred[i, target_label] > 0.8:
 				filename = str(target_label) + "_" + str(pred[i, target_label].item())[0:6] + "_" + str(
 					opt3.item())[0:6] + "_" + str(random.randint(1000000, 9999999)) + ".png"
-				save_image(X[i].clamp(0, 1), os.path.join(options.out_dir_name, model_based_dir_name, filename))
+				if options.prior:
+					image_to_save = X[i].clamp(0, 1.0)
+				else :
+					image_to_save = pp[i].clamp(0, 1.0)
+				save_image(image_to_save, os.path.join(options.out_dir_name, model_based_dir_name, filename))
 creation_type = options.out_dir_name.split('/')[-1]
 np_array_to_save_optimized_features = np.array(array_to_save_optimized_features)
 np_dir_name = "../res/misc/" + creation_type
