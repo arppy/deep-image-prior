@@ -417,11 +417,11 @@ for target_label in dict_training_features:
 
 			activation_to_optimize.requires_grad = False
 			#torch.fmax(activation_to_optimize,torch.ones(1).to(DEVICE),out=activation_to_optimize)
-			torch.nn.functional.normalize(activation_to_optimize, p=2.0, dim=0, eps=1e-12, out=activation_to_optimize)
-			activation_to_optimize *= torch.linalg.vector_norm(distant_images_activations, ord=2, dim=0, keepdim=True)
+			torch.nn.functional.normalize(activation_to_optimize[0], p=2.0, dim=0, eps=1e-12, out=activation_to_optimize[0])
+			activation_to_optimize[0] *= torch.linalg.vector_norm(distant_images_activations[0], ord=2, dim=0, keepdim=True)
 
 			if options.verbose:
-				print(target_label, "0", i, pred_by_target.item(), opt.item(), opt2.item(), activation_to_optimize.shape, distant_images_activations.shape, end=' ')
+				print(target_label, "0", i, pred_by_target.item(), opt.item(), opt2.item(), activation_to_optimize[0].shape, distant_images_activations[0].shape, end=' ')
 				if options.cosine_learning:
 					print("lr:", scheduler.get_last_lr()[0])
 				else:
