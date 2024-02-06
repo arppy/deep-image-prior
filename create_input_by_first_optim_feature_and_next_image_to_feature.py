@@ -481,14 +481,12 @@ for target_label in dict_training_features:
 														start_dim=1, end_dim=-1)
 			pred = torch.nn.functional.softmax(logits, dim=1)
 			pred_by_target = pred[range(pred.shape[0]), target_label]
-			# opt = torch.sum(pred_by_target)
-			opt = rem(logits, target_label).logsumexp(1) - logits[:, target_label]
+			opt = torch.sum(pred_by_target)
+			#opt = rem(logits, target_label).logsumexp(1) - logits[:, target_label]
 			cossim = cos_sim(activations_image_optimized, activation_to_optimize)
-			cossim2 = cos_sim(activations_image_optimized, distant_images_activations)
 			opt2 = torch.mean(cossim)
-			opt3 = torch.mean(cossim2)
 			if i < iternum:
-				(-opt2).backward()
+				(-alpha * opt - beta * opt2).backward()
 				optimizer.step()
 				if options.cosine_learning:
 					scheduler.step()
