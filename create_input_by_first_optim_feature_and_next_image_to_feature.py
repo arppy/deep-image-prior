@@ -409,7 +409,7 @@ for target_label in dict_training_features:
 			# opt = rem(logits,target_label).logsumexp(1)-logits[:,target_label]
 			cossim = cos_sim(activation_to_optimize, distant_images_activations)
 			opt2 = torch.mean(cossim)
-			(-alpha * opt + beta * opt2 + gamma * opt3).backward()
+			(-alpha * opt + beta * opt2 ).backward()
 			optimizer.step()
 			opt3 = torch.sum(torch.square(activation_to_optimize))
 			if options.cosine_learning:
