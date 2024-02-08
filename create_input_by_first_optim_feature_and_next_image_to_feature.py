@@ -490,8 +490,11 @@ for target_label in dict_training_features:
 				optimizer.step()
 				if options.cosine_learning:
 					scheduler.step()
+			else :
+				cossim2 = cos_sim(activations_image_optimized, distant_images_activations)
+				opt3 = torch.mean(cossim2)
 			if options.verbose:
-				print(target_label, "1", i, pred_by_target.item(), opt.item(), opt2.item(), opt3.item(), end=' ')
+				print(target_label, "1", i, pred_by_target.item(), opt.item(), opt2.item(), end=' ')
 				if options.cosine_learning:
 					print("lr:", scheduler.get_last_lr()[0])
 				else:
