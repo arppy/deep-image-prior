@@ -487,7 +487,7 @@ for target_label in dict_training_features:
 			# opt2 = torch.mean(cossim)
 			l2dist = torch.sum(torch.square(activations_image_optimized-activation_to_optimize))
 			if i < iternum:
-				l2dist.backward()
+				(-alpha*opt+beta*l2dist).backward()
 				optimizer.step()
 				if options.cosine_learning:
 					scheduler.step()
@@ -495,7 +495,7 @@ for target_label in dict_training_features:
 				cossim2 = cos_sim(activations_image_optimized, distant_images_activations)
 				opt3 = torch.mean(cossim2)
 			if options.verbose:
-				print(target_label, "1", i, pred_by_target.item(), opt.item(), l2dist.item(), end=' ')
+				print(target_label, "1", i, pred_by_target.item(), l2dist.item(), end=' ')
 				if options.cosine_learning:
 					print("lr:", scheduler.get_last_lr()[0])
 				else:
