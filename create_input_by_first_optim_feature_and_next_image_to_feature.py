@@ -399,7 +399,7 @@ for target_label in dict_training_features:
 															last_epoch=-1, verbose=False)
 		else:
 			optimizer = torch.optim.Adam([{'params': activation_to_optimize, 'lr': options.learning_rate}])
-		for i in range(iternum):
+		for i in range(1000):
 			activation_to_optimize.requires_grad = True
 			logits = model_head(activation_to_optimize)
 
@@ -421,7 +421,7 @@ for target_label in dict_training_features:
 			activation_to_optimize[0] *= torch.linalg.vector_norm(distant_images_activations[0], ord=2, dim=0, keepdim=True)
 
 			if options.verbose:
-				print(target_label, "0", i, pred_by_target.item(), opt.item(), opt2.item(), end=' ')
+				print(target_label, "0", i, pred_by_target.item(), opt2.item(), end=' ')
 				if options.cosine_learning:
 					print("lr:", scheduler.get_last_lr()[0])
 				else:
@@ -500,7 +500,7 @@ for target_label in dict_training_features:
 					print("lr:", scheduler.get_last_lr()[0])
 				else:
 					print("")
-		if pred[0, target_label] > 0.8:
+		if pred[0, target_label] > 0.5:
 			filename = str(target_label) + "_" + str(pred[0, target_label].item())[0:6] + "_" + str(
 				opt3.item())[0:6] + "_" + str(random.randint(1000000, 9999999)) + ".png"
 			if options.prior:
