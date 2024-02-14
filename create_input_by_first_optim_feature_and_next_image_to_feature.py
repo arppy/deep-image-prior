@@ -453,8 +453,8 @@ for target_label in dict_training_features:
 			pp = torch.zeros(data.shape[1:]).unsqueeze(0).to(DEVICE)
 			pp.requires_grad = True
 		if options.cosine_learning:
-			optimizer = torch.optim.AdamW(pp, lr=options.learning_rate, weight_decay=1e-4)
-			scheduler = torch.optim.lr_scheduler.OneCycleLR(optimizer, max_lr=options.learning_rate,
+			optimizer2 = torch.optim.AdamW(pp, lr=options.learning_rate, weight_decay=1e-4)
+			scheduler2 = torch.optim.lr_scheduler.OneCycleLR(optimizer2, max_lr=options.learning_rate,
 															total_steps=None,
 															epochs=options.num_iters, steps_per_epoch=1,
 															pct_start=options.pct_start,
@@ -463,10 +463,10 @@ for target_label in dict_training_features:
 															final_div_factor=1000000000.0, three_phase=False,
 															last_epoch=-1, verbose=False)
 		else:
-			optimizer = torch.optim.Adam([{'params': pp, 'lr': options.learning_rate}])
+			optimizer2 = torch.optim.Adam([{'params': pp, 'lr': options.learning_rate}])
 		for i in range(iternum + 1):
 			if options.prior:
-				optimizer.zero_grad()
+				optimizer2.zero_grad()
 				if param_noise:
 					for n in [x for x in net.parameters() if len(x.size()) == 4]:
 						n = n + n.detach().clone().normal_() * n.std() / 50
@@ -474,35 +474,35 @@ for target_label in dict_training_features:
 				if reg_noise_std > 0:
 					net_input = net_input_saved + (noise.normal_() * reg_noise_std)
 				X = net(net_input)[:, :, :imsize, :imsize]
-				logits = model_poisoned(transformNorm(X))
+				logits2 = model_poisoned(transformNorm(X))
 			else :
-				logits = model_poisoned(transformNorm(pp))
+				logits2 = model_poisoned(transformNorm(pp))
 			activations_image_optimized = torch.flatten(activation_extractor.pre_activations[layer_name],
 														start_dim=1, end_dim=-1)
-			pred = torch.nn.functional.softmax(logits, dim=1)
-			pred_by_target = pred[range(pred.shape[0]), target_label]
-			opt = torch.sum(pred_by_target)
+			pred2 = torch.nn.functional.softmax(logits2, dim=1)
+			pred_by_target2 = pred2[range(pred2.shape[0]), target_label]
+			opt5 = torch.sum(pred_by_target2)
 			#opt = rem(logits, target_label).logsumexp(1) - logits[:, target_label]
-			cossim = cos_sim(activations_image_optimized, activation_to_optimize)
-			opt2 = torch.mean(cossim)
+			cossim2 = cos_sim(activations_image_optimized, activation_to_optimize)
+			opt6 = torch.mean(cossim2)
 			#l2dist = torch.sum(torch.square(activations_image_optimized-activation_to_optimize))
 			if i < iternum:
-				(-alpha*opt+beta*opt2).backward()
-				optimizer.step()
+				(-alpha*opt5+beta*opt6).backward()
+				optimizer2.step()
 				if options.cosine_learning:
-					scheduler.step()
+					scheduler2.step()
 			else :
-				cossim2 = cos_sim(activations_image_optimized, distant_images_activations)
-				opt3 = torch.mean(cossim2)
+				cossim3 = cos_sim(activations_image_optimized, distant_images_activations)
+				opt7 = torch.mean(cossim3)
 			if options.verbose:
-				print(target_label, "1", i, pred_by_target.item(), opt2.item(), end=' ')
+				print(target_label, "1", i, pred_by_target2.item(), opt6.item(), end=' ')
 				if options.cosine_learning:
-					print("lr:", scheduler.get_last_lr()[0])
+					print("lr:", scheduler2.get_last_lr()[0])
 				else:
 					print("")
 		if pred[0, target_label] > 0.5:
 			filename = str(target_label) + "_" + str(pred[0, target_label].item())[0:6] + "_" + str(
-				opt3.item())[0:6] + "_" + str(random.randint(1000000, 9999999)) + ".png"
+				opt7.item())[0:6] + "_" + str(random.randint(1000000, 9999999)) + ".png"
 			if options.prior:
 				image_to_save = X[0].clamp(0, 1.0)
 			else :
