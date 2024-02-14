@@ -483,7 +483,7 @@ for target_label in dict_training_features:
 			pred_by_target = pred[range(pred.shape[0]), target_label]
 			opt = torch.sum(pred_by_target)
 			#opt = rem(logits, target_label).logsumexp(1) - logits[:, target_label]
-			#cossim = cos_sim(activations_image_optimized, activation_to_optimize)
+			cossim = cos_sim(activations_image_optimized, activation_to_optimize)
 			opt2 = torch.mean(cossim)
 			#l2dist = torch.sum(torch.square(activations_image_optimized-activation_to_optimize))
 			if i < iternum:
