@@ -40,7 +40,7 @@ fi
 for model_name in $(ls $model_dir*.pt* | shuf) ; do
   weak_attack="False"
   for l in $weak_attacks; do
-    if [[ "$(basename $a)" == "$l" ]]; then
+    if [[ "$(basename $model_name)" == "$l" ]]; then
       weak_attack="True"
       break
     fi
