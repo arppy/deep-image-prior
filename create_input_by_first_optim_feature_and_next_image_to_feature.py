@@ -485,15 +485,14 @@ for target_label in dict_training_features:
 			#opt = rem(logits, target_label).logsumexp(1) - logits[:, target_label]
 			cossim2 = cos_sim(activations_image_optimized, activation_to_optimize)
 			opt6 = torch.mean(cossim2)
+			cossim3 = cos_sim(activations_image_optimized, distant_images_activations)
+			opt7 = torch.mean(cossim3)
 			#l2dist = torch.sum(torch.square(activations_image_optimized-activation_to_optimize))
 			if i < iternum:
-				(-alpha*opt5-beta*opt6).backward()
+				(-alpha*opt5-beta*opt6+(beta/10)*opt7).backward()
 				optimizer2.step()
 				if options.cosine_learning:
 					scheduler2.step()
-			else :
-				cossim3 = cos_sim(activations_image_optimized, distant_images_activations)
-				opt7 = torch.mean(cossim3)
 			if options.verbose:
 				print(target_label, "1", i, pred_by_target2.item(), opt6.item(), end=' ')
 				if options.cosine_learning:
