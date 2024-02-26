@@ -31,23 +31,7 @@ fi
 
 script_prefix=${15} # "--prior"
 
-weak_attacks=""
-if [ -e $model_dir"/weak_attacks.out" ]; then
-  weak_attacks=$(cat $model_dir"/weak_attacks.out")
-fi
-
-
 for model_name in $(ls $model_dir*.pt* | shuf) ; do
-  weak_attack="False"
-  for l in $weak_attacks; do
-    if [[ "$(basename $model_name)" == "$l" ]]; then
-      weak_attack="True"
-      break
-    fi
-  done
-  if [[ "$weak_attack" == "True" ]]; then
-    continue
-  fi
   if [ "$method" == "optim_prior" ]; then
     if [ "$a_bool" = true ]; then
       python create_input_by_optim_prior.py --model $model_name --verbose --learning_rate $learning_rate --pct_start $pct_start --out_dir_name $out_dir --num_iters $num_iters --num_images_per_class $num_images_per_class --gpu $gpu --early_stopping --model_architecture $arch --dataset $dataset --dataset_subset $datasubset
