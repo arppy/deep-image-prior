@@ -16,7 +16,8 @@ import argparse
 import torchvision.models as models
 import torchvision.datasets as datasets
 
-from models.preact_resnet import PreActResNet18, PreActBlock
+from models.preact_resnet import PreActResNet18
+from models.resnetmod_ulp import resnet18_mod
 
 class ResNetOnlyLinear(torch.nn.Module):
     def __init__(self, expansion, num_classes=10):
@@ -145,6 +146,7 @@ class DATABASES(Enum):
 	CIFAR10 = 'torchvision.datasets.CIFAR10'
 	CIFAR100 = 'torchvision.datasets.CIFAR100'
 	IMAGENET = 'torchvision.datasets.ImageNet'
+	TINYIMAGENET = 'Tiny-ImageNet'
 	AFHQ = 'AnimalFacesHQ'
 
 class DATABASE_SUBSET(Enum):
@@ -190,12 +192,21 @@ database_statistics[DATABASES.AFHQ.value] = {
 	'image_shape': [224, 224],
 	'samples_per_epoch' : 14000
 }
+database_statistics[DATABASES.TINYIMAGENET.value] = {
+	'name' : "tiny-imagenet",
+	'mean': [0.485, 0.456, 0.406],
+	'std': [0.229, 0.224, 0.225],
+	'num_classes': 200,
+	'image_shape': [64, 64],
+	'samples_per_epoch' : 100000
+}
 
 class MODEL_ARCHITECTURES(Enum):
 	RESNET18 = "resnet18"
 	PREACTRESNET18 = "preact18"
 	WIDERESNET = "wideresnet"
 	XCIT_S = "xcits"
+	ULP_RESNET_MOD = "ulp_resnetmod"
 
 def freeze(net_to_freeze):
 	for p in net_to_freeze.parameters():
@@ -306,6 +317,10 @@ elif options.model_architecture == MODEL_ARCHITECTURES.PREACTRESNET18.value:
 	model_poisoned = PreActResNet18(num_classes).to(DEVICE)
 	normalized_model = False
 	layer_name = "linear"
+elif options.model_architecture == MODEL_ARCHITECTURES.PREACTRESNET18.value:
+	model_poisoned = resnet18_mod(num_classes=num_classes).to(DEVICE)
+	normalized_model = False
+	layer_name = "fc"
 else :
 	if options.dataset == DATABASES.CIFAR10.value :
 		ResNet = import_from('robustbench.model_zoo.architectures.resnet', 'ResNet')
@@ -321,7 +336,7 @@ else :
 		layer_name = "fc"
 	normalized_model = False
 
-if options.model[-1] == 't' :
+if options.model[-5] == '_1.pt' :
 	load_file = torch.load(options.model)
 	model_poisoned.load_state_dict(load_file['model'])
 	model_poisoned = model_poisoned.to(DEVICE)
