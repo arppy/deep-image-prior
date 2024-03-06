@@ -317,7 +317,7 @@ elif options.model_architecture == MODEL_ARCHITECTURES.PREACTRESNET18.value:
 	model_poisoned = PreActResNet18(num_classes).to(DEVICE)
 	normalized_model = False
 	layer_name = "linear"
-elif options.model_architecture == MODEL_ARCHITECTURES.PREACTRESNET18.value:
+elif options.model_architecture == MODEL_ARCHITECTURES.ULP_RESNET_MOD.value:
 	model_poisoned = resnet18_mod(num_classes=num_classes).to(DEVICE)
 	normalized_model = False
 	layer_name = "fc"
