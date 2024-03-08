@@ -121,6 +121,8 @@ def get_loader_for_reference_image(data_path, dataset_name, batch_size, num_of_w
 	if dataset_name == DATABASES.IMAGENET.value:
 		transform_list.append(transforms.Resize(256))
 		transform_list.append(transforms.CenterCrop(224))
+	elif options.dataset == DATABASES.TINYIMAGENET.value:
+		transform_list.append(transforms.CenterCrop(56))
 	elif dataset_name == DATABASES.AFHQ.value:
 		transform_list.append(transforms.Resize(224))
 	transform_list.append(transforms.ToTensor())
@@ -197,7 +199,7 @@ database_statistics[DATABASES.TINYIMAGENET.value] = {
 	'mean': [0.485, 0.456, 0.406],
 	'std': [0.229, 0.224, 0.225],
 	'num_classes': 200,
-	'image_shape': [64, 64],
+	'image_shape': [56, 56],
 	'samples_per_epoch' : 100000
 }
 
