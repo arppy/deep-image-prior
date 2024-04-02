@@ -36,6 +36,17 @@ class WideResNetOnlyLinear(torch.nn.Module):
 
     def forward(self, x):
         return self.fc(x)
+
+class ModelTransformWrapper(torch.nn.Module):
+  def __init__(self, model, transform, device):
+    super(ModelTransformWrapper, self).__init__()
+    self.model = model
+    self.transform = transform
+    self.parameters = model.parameters
+
+  def forward(self, x):
+    return self.model.forward(self.transform(x))
+
 class ActivationExtractor(torch.nn.Module):
 	def __init__(self, model: torch.nn.Module, layers=None, activated_layers=None, activation_value=1):
 		super().__init__()
@@ -234,6 +245,7 @@ parser.add_argument('--learning_rate', type=float, default=0.01, help='learning 
 parser.add_argument('--gpu', type=int, default=0)
 parser.add_argument('--model', type=str, default=None, help='model')
 parser.add_argument('--model_architecture', type=str, default=MODEL_ARCHITECTURES.RESNET18.value, choices=[e.value for e in MODEL_ARCHITECTURES], help='load mode weights')
+parser.add_argument('--model_wrapped', default=False, action='store_true')
 parser.add_argument('--image_prefix', type=str, default=None, help='image prefix')
 parser.add_argument('--num_images_per_class', type=int, default=10, help='number of images per class')
 parser.add_argument('--out_dir_name', type=str, default=None, help='name of output directory which will cointains the generated inputs')
@@ -321,6 +333,8 @@ elif options.model_architecture == MODEL_ARCHITECTURES.PREACTRESNET18.value:
 	layer_name = "linear"
 elif options.model_architecture == MODEL_ARCHITECTURES.ULP_RESNET_MOD.value:
 	model_poisoned = resnet18_mod(num_classes=num_classes).to(DEVICE)
+	if options.model_wrapped :
+		model_poisoned = ModelTransformWrapper(model_poisoned,transformNorm,DEVICE)
 	normalized_model = False
 	layer_name = "fc"
 else :
@@ -344,6 +358,10 @@ if options.model[-5] == '_1.pt' :
 	model_poisoned = model_poisoned.to(DEVICE)
 else:
 	model_poisoned.load_state_dict(torch.load(options.model, map_location=DEVICE))
+
+if options.model_wrapped :
+	model_poisoned = model_poisoned.model
+
 model_poisoned.eval()
 freeze(model_poisoned)
 if options.model_architecture == MODEL_ARCHITECTURES.WIDERESNET.value :
