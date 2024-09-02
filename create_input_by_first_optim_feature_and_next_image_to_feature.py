@@ -413,7 +413,7 @@ for target_label in dict_training_features:
 			num_of_images -= 1
 	distant_image_candidates_activations = dict_training_features[target_label]
 	print(model_based_dir_name, target_label, num_of_images)
-	for ith_image in range(num_of_images):
+	for ith_image in range(100):
 		random_image_indices = random.sample(range(distant_image_candidates_activations.shape[0]), options.num_of_distant_reference_images)
 		distant_images_activations = torch.clone(distant_image_candidates_activations[random_image_indices])
 		distant_images_activations = distant_images_activations.detach().to(DEVICE)
@@ -536,6 +536,7 @@ for target_label in dict_training_features:
 				else:
 					print("")
 		if pred[0, target_label] > 0.5:
+			num_of_images -= 1
 			filename = str(target_label) + "_" + str(pred[0, target_label].item())[0:6] + "_" + str(
 				opt7.item())[0:6] + "_" + str(random.randint(1000000, 9999999)) + ".png"
 			if options.prior:
@@ -543,6 +544,8 @@ for target_label in dict_training_features:
 			else :
 				image_to_save = pp[0].clamp(0, 1.0)
 			save_image(image_to_save, os.path.join(options.out_dir_name, model_based_dir_name, filename))
+		if num_of_images == 0 :
+			break
 creation_type = options.out_dir_name.split('/')[-1]
 np_array_to_save_optimized_features = np.array(array_to_save_optimized_features)
 np_dir_name = "../res/misc/" + creation_type
