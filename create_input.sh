@@ -47,7 +47,7 @@ for model_name in $(ls $model_dir*.pt* | shuf) ; do
       python create_input_by_optim_feature_and_prior.py --model $model_name --alpha $alpha --beta $beta --verbose --learning_rate $learning_rate --pct_start $pct_start --out_dir_name $out_dir --num_iters $num_iters --num_images_per_class $num_images_per_class --gpu $gpu --model_architecture $arch --dataset $dataset --dataset_subset $datasubset
     fi;
   elif [ "$method" == "optim_feature_moving_away_from_reference_images_and_prior" ]; then
-    python create_input_by_optim_prior_and_moving_away_new_version.py --model $model_name --alpha $alpha --beta $beta --learning_rate $learning_rate --pct_start $pct_start --out_dir_name $out_dir --num_iters $num_iters --num_images_per_class $num_images_per_class --gpu $gpu --model_architecture $arch --dataset $dataset --dataset_subset $datasubset
+    python create_input_by_optim_prior_and_moving_away_new_version.py  $script_prefix --model $model_name --alpha $alpha --beta $beta --learning_rate $learning_rate --pct_start $pct_start --out_dir_name $out_dir --num_iters $num_iters --num_images_per_class $num_images_per_class --gpu $gpu --model_architecture $arch --dataset $dataset --dataset_subset $datasubset
   elif [ "$method" == "create_input_by_first_optim_feature_and_next_image_to_feature" ]; then
     python create_input_by_first_optim_feature_and_next_image_to_feature.py $script_prefix --model $model_name --alpha $alpha --beta $beta --learning_rate $learning_rate --pct_start $pct_start --out_dir_name $out_dir --num_iters $num_iters --num_images_per_class $num_images_per_class --gpu $gpu --model_architecture $arch --dataset $dataset --dataset_subset $datasubset
   fi;
