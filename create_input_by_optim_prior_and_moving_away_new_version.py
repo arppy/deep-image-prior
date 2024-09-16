@@ -364,25 +364,6 @@ if options.model_wrapped :
 
 model_poisoned.eval()
 freeze(model_poisoned)
-if options.model_architecture == MODEL_ARCHITECTURES.WIDERESNET.value :
-	model_head = WideResNetOnlyLinear(num_classes=num_classes).to(DEVICE)
-	freeze(model_head)
-	model_head.fc.weight.copy_(model_poisoned.fc.weight)
-	model_head.fc.bias.copy_(model_poisoned.fc.bias)
-elif options.model_architecture == MODEL_ARCHITECTURES.XCIT_S.value :
-	# TODO
-	pass
-else :
-	model_head = ResNetOnlyLinear(expansion=1, num_classes=num_classes).to(DEVICE)
-	freeze(model_head)
-	if options.dataset == DATABASES.CIFAR10.value :
-		model_head.linear.weight.copy_(model_poisoned.linear.weight)
-		model_head.linear.bias.copy_(model_poisoned.linear.bias)
-	else :
-		model_head.linear.weight.copy_(model_poisoned.fc.weight)
-		model_head.linear.bias.copy_(model_poisoned.fc.bias)
-model_head.eval()
-freeze(model_head)
 
 alpha = options.alpha
 beta = options.beta
@@ -419,55 +400,7 @@ for target_label in dict_training_features:
 		random_image_indices = random.sample(range(distant_image_candidates_activations.shape[0]), options.num_of_distant_reference_images)
 		distant_images_activations = torch.clone(distant_image_candidates_activations[random_image_indices])
 		distant_images_activations = distant_images_activations.detach().to(DEVICE)
-		activation_to_optimize = get_noise_for_activation(distant_images_activations[0].unsqueeze(0)).detach()
-		activation_to_optimize.requires_grad = True
-		activation_to_optimize = activation_to_optimize.to(DEVICE)
-		distant_images_activations = distant_images_activations.detach().to(DEVICE)
 		distant_images_activations.requires_grad = False
-		if options.cosine_learning:
-			optimizer = torch.optim.AdamW([activation_to_optimize], lr=options.learning_rate, weight_decay=1e-4)
-			scheduler = torch.optim.lr_scheduler.OneCycleLR(optimizer, max_lr=options.learning_rate,
-															total_steps=None,
-															epochs=iternum, steps_per_epoch=1,
-															pct_start=options.pct_start,
-															anneal_strategy='cos', cycle_momentum=False,
-															div_factor=1.0,
-															final_div_factor=1000000000.0, three_phase=False,
-															last_epoch=-1, verbose=False)
-		else:
-			optimizer = torch.optim.Adam([{'params': activation_to_optimize, 'lr': options.learning_rate}])
-		for i in range(1000):
-			activation_to_optimize.requires_grad = True
-			logits = model_head(activation_to_optimize)
-
-			optimizer.zero_grad()
-			pred = torch.nn.functional.softmax(logits, dim=1)
-			pred_by_target = pred[range(pred.shape[0]), target_label]
-			opt = torch.sum(pred_by_target)
-			# opt = rem(logits,target_label).logsumexp(1)-logits[:,target_label]
-			cossim = cos_sim(activation_to_optimize, distant_images_activations)
-			opt2 = torch.mean(cossim)
-			(-alpha * opt + beta * opt2 ).backward()
-			optimizer.step()
-			opt3 = torch.sum(torch.square(activation_to_optimize))
-			if options.cosine_learning:
-				scheduler.step()
-
-			activation_to_optimize.requires_grad = False
-			torch.nn.functional.normalize(activation_to_optimize[0], p=2.0, dim=0, eps=1e-12, out=activation_to_optimize[0])
-			activation_to_optimize[0] *= torch.linalg.vector_norm(distant_images_activations[0], ord=2, dim=0, keepdim=True)
-
-			if options.verbose:
-				print(target_label, "0", i, pred_by_target.item(), opt2.item(), end=' ')
-				if options.cosine_learning:
-					print("lr:", scheduler.get_last_lr()[0])
-				else:
-					print("")
-		activation_to_optimize = activation_to_optimize.detach()
-		out_list = np.append(np.array([target_label]), np.array(activation_to_optimize.cpu().numpy()))
-		array_to_save_optimized_features.append(out_list)
-		activation_to_optimize.requires_grad = False
-
 		if options.prior :
 			net_input = get_noise(input_depth, 'noise', imsize_net).type(dtype).detach()
 			net_input = net_input.to(DEVICE)
@@ -520,12 +453,12 @@ for target_label in dict_training_features:
 			pred_by_target2 = pred2[range(pred2.shape[0]), target_label]
 			opt5 = torch.sum(pred_by_target2)
 			#opt = rem(logits, target_label).logsumexp(1) - logits[:, target_label]
-			cossim2 = cos_sim(activations_image_optimized, activation_to_optimize)
+			cossim2 = cos_sim(activations_image_optimized, distant_images_activations)
 			opt6 = torch.mean(cossim2)
 			#l2dist = torch.sum(torch.square(activations_image_optimized-activation_to_optimize))
 			if i < iternum:
 				if beta > 0.0 :
-					(-alpha*opt5-beta*opt6).backward()
+					(-alpha*opt5+beta*opt6).backward()
 				else :
 					(-opt5).backward()
 				optimizer2.step()
